@@ -49,8 +49,24 @@ class Settings:
     CHUNK_MAX_TOKENS: int = int(os.getenv("CHUNK_MAX_TOKENS", "512"))
     CHUNK_MERGE_PEERS: bool = os.getenv("CHUNK_MERGE_PEERS", "true").lower() == "true"
 
+    # ── PDF Input ────────────────────────────────────────────
+    PDF_PATH: str = os.getenv("PDF_PATH", "pdfs/sample.pdf")
+
+    @property
+    def resolved_pdf_path(self) -> Path:
+        """Resolve PDF_PATH to an absolute Path (supporting relative to project root or absolute paths)."""
+        p = Path(self.PDF_PATH)
+        if p.is_absolute() and p.exists():
+            return p
+        root = Path(__file__).resolve().parent.parent
+        resolved = (root / p).resolve()
+        if resolved.exists():
+            return resolved
+        return p if p.is_absolute() else resolved
+
     def summary(self) -> str:
         """Return a human-readable summary of the active configuration."""
+        pdf_display = self.PDF_PATH if len(self.PDF_PATH) <= 30 else "..." + self.PDF_PATH[-27:]
         lines = [
             "╔══════════════════════════════════════════════╗",
             "║       RAG Pipeline — Active Configuration     ║",
@@ -58,6 +74,7 @@ class Settings:
             f"║  📡 LLM:       {self.LLM_PROVIDER:>12} → {self.LLM_MODEL:<16} ║",
             f"║  👁️  VLM:       {self.VLM_PROVIDER:>12} → {self.VLM_MODEL:<16} ║",
             f"║  🧬 Embed:     {self.EMBEDDING_PROVIDER:>12} → {self.EMBEDDING_MODEL[-20:]:<16} ║",
+            f"║  📄 PDF:       {pdf_display:<35} ║",
             f"║  ⚖️  Weights:   BM25={self.BM25_WEIGHT}  Vector={self.VECTOR_WEIGHT:<10} ║",
             f"║  📦 Top-K:     {self.TOP_K:<35} ║",
             f"║  ✂️  Chunk:     max_tokens={self.CHUNK_MAX_TOKENS}, merge={self.CHUNK_MERGE_PEERS}  ║",
