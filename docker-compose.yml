@@ -1,0 +1,54 @@
+services:
+  notebook:
+    build: .
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/app/notebooks
+      - ./pdfs:/app/pdfs
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./providers:/app/providers
+      - ./.env:/app/.env
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      - chromadb
+      - ollama
+    networks:
+      - ragnet
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/chroma:/chroma/chroma
+    networks:
+      - ragnet
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - ragnet
+    # ──────────────────────────────────────────────
+    # Uncomment below for NVIDIA GPU passthrough:
+    # ──────────────────────────────────────────────
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+networks:
+  ragnet:
+    driver: bridge
+
+volumes:
+  ollama_data:
