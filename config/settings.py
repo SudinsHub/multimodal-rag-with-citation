@@ -31,6 +31,7 @@ class Settings:
     # ── Embeddings ───────────────────────────────────────────
     EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "local")
     EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    EMBEDDING_DIMENSION: int = int(os.getenv("EMBEDDING_DIMENSION", "768"))
 
     # ── API Keys ─────────────────────────────────────────────
     GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")

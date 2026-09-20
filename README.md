@@ -9,29 +9,27 @@ A citation-aware RAG pipeline that handles diverse PDF content (text, tables, im
 - 📄 **Docling** — intelligent PDF extraction (layout analysis, OCR, table detection, figure extraction)
 - ✂️ **HybridChunker** — structure-aware chunking with full citation provenance
 - 🖼️ **Multimodal VLM** — generates text summaries from images/figures
-- 🔀 **Hybrid Search** — BM25 (keyword) + Vector (semantic) with Reciprocal Rank Fusion
-- 📌 **Citations** — every answer traces back to exact page + bounding box coordinates
-- 🔌 **Provider-agnostic** — switch between Ollama, Gemini, OpenRouter, OpenAI via `.env`
-- 🐳 **Dockerized** — one command to start everything
+- 🔀 **Hybrid Search** — PostgreSQL full-text search (BM25) + pgvector (cosine) with Reciprocal Rank Fusion (RRF)
+- 📌 **Search with Proof** — answers cite exact page numbers, section breadcrumbs, and bounding box coordinates
+- 🌐 **Web Application** — FastAPI backend + Next.js (TypeScript) frontend + TanStack Query
+- 🎨 **ChatGPT Design** — Achromatic graphite-on-paper style reference with dark & light theme toggling
+- 📋 **Document Details Selector** — choose content type (auto_detect, text_only, tables, images, scanned, mixed) and chunking options at upload time
+- 🔌 **Provider-agnostic Factory** — switch LLM/VLM/Embedding via `.env` (Ollama, Gemini, OpenRouter, OpenAI)
+- 🐳 **Docker-First** — complete stack run via Docker Compose
 
-## Quick Start
-
-### With Docker (recommended)
+## Quick Start (Docker)
 
 ```bash
-# 1. Configure
+# 1. Configure environment
 cp .env.example .env
-# Edit .env with your preferred LLM provider
+# Fill in your preferred LLM provider and keys in .env
 
-# 2. Start all services
-docker-compose up --build
+# 2. Start PostgreSQL with pgvector, FastAPI backend, and Next.js frontend
+docker compose up --build -d postgres backend frontend
 
-# 3. Pull Ollama models (if using local LLM)
-docker exec -it construction-rag-2-ollama-1 ollama pull llama3.2
-docker exec -it construction-rag-2-ollama-1 ollama pull llava
-
-# 4. Open the notebook
-# → http://localhost:8888/notebooks/rag_pipeline.ipynb
+# 3. Access Web Application
+# Frontend: http://localhost:3000
+# Backend API & Docs: http://localhost:8000/docs
 ```
 
 ### Without Docker

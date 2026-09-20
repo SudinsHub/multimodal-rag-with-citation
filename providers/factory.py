@@ -110,10 +110,13 @@ def get_embeddings():
 
     elif provider == "gemini":
         from langchain_google_genai import GoogleGenerativeAIEmbeddings
-        return GoogleGenerativeAIEmbeddings(
-            model=settings.EMBEDDING_MODEL,
-            google_api_key=settings.GOOGLE_API_KEY,
-        )
+        kwargs = {
+            "model": settings.EMBEDDING_MODEL,
+            "google_api_key": settings.GOOGLE_API_KEY,
+        }
+        if getattr(settings, "EMBEDDING_DIMENSION", None):
+            kwargs["output_dimensionality"] = settings.EMBEDDING_DIMENSION
+        return GoogleGenerativeAIEmbeddings(**kwargs)
 
     else:
         raise ValueError(

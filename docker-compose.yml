@@ -1,54 +1,80 @@
 services:
-  notebook:
-    build: .
+  # ============================================================
+  # PostgreSQL with pgvector extension
+  # ============================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: construction_rag_postgres
     ports:
-      - "8888:8888"
-    volumes:
-      - ./notebooks:/app/notebooks
-      - ./pdfs:/app/pdfs
-      - ./data:/app/data
-      - ./config:/app/config
-      - ./providers:/app/providers
-      - ./.env:/app/.env
+      - "5432:5432"
     environment:
-      - PYTHONPATH=/app
-    depends_on:
-      - chromadb
-      - ollama
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
     networks:
       - ragnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  chromadb:
-    image: chromadb/chroma:latest
+  # ============================================================
+  # FastAPI Backend Service
+  # ============================================================
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: construction_rag_backend
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir backend --reload-dir config --reload-dir providers
     ports:
       - "8000:8000"
     volumes:
-      - ./data/chroma:/chroma/chroma
+      - ./backend:/app/backend
+      - ./config:/app/config
+      - ./providers:/app/providers
+      - ./data:/app/data
+      - ./pdfs:/app/pdfs
+      - ./.env:/app/.env
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION}
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - ragnet
 
-  ollama:
-    image: ollama/ollama:latest
+  # ============================================================
+  # Next.js Frontend Service
+  # ============================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: construction_rag_frontend
     ports:
-      - "11434:11434"
+      - "3000:3000"
     volumes:
-      - ollama_data:/root/.ollama
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
     networks:
       - ragnet
-    # ──────────────────────────────────────────────
-    # Uncomment below for NVIDIA GPU passthrough:
-    # ──────────────────────────────────────────────
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
 
 networks:
   ragnet:
     driver: bridge
 
 volumes:
-  ollama_data:
+  pgvector_data:
