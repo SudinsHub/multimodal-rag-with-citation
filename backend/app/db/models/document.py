@@ -30,15 +30,20 @@ class Document(Base):
     chunk_count = Column(Integer, default=0)
     docling_metadata = Column(JSONB, nullable=True, default=dict)
     
+    # Owner tenancy
+    user_id = Column(String(255), ForeignKey("user.id", ondelete="CASCADE"), nullable=True, index=True)
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    user = relationship("User", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_documents_status", "status"),
         Index("idx_documents_created_at", "created_at"),
+        Index("idx_documents_user_id", "user_id"),
     )
 
 

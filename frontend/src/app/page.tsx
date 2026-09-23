@@ -5,15 +5,22 @@ import { Sidebar } from "../components/sidebar/Sidebar";
 import { ChatWorkspace } from "../components/chat/ChatWorkspace";
 import { DocumentUploadModal } from "../components/upload/DocumentUploadModal";
 import { CitationDrawer } from "../components/citations/CitationDrawer";
+import { AuthModal } from "../components/auth/AuthModal";
 import { useDocuments } from "../hooks/useDocuments";
 import { useChat } from "../hooks/useChat";
 import { CitationProof } from "../types/citation";
+import { useSession } from "../lib/auth-client";
 
 export default function Home() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Authentication session
+  const { data: sessionData, isPending: isSessionLoading } = useSession();
+  const currentUser = sessionData?.user || null;
 
   // Citation drawer state
   const [isCitationDrawerOpen, setIsCitationDrawerOpen] = useState(false);
@@ -59,6 +66,10 @@ export default function Home() {
   }, [sessions, activeSessionId]);
 
   const handleNewChat = async () => {
+    if (!currentUser) {
+      setIsAuthModalOpen(true);
+      return;
+    }
     try {
       const newSession = await createSession({
         title: "New Conversation",
@@ -71,6 +82,10 @@ export default function Home() {
   };
 
   const handleSendMessage = async (text: string) => {
+    if (!currentUser) {
+      setIsAuthModalOpen(true);
+      return;
+    }
     let currentSessionId = activeSessionId;
     if (!currentSessionId) {
       const newSession = await createSession({
@@ -122,7 +137,13 @@ export default function Home() {
         documents={documents}
         selectedDocumentId={selectedDocumentId}
         onSelectDocument={(id) => setSelectedDocumentId(id)}
-        onOpenUploadModal={() => setIsUploadModalOpen(true)}
+        onOpenUploadModal={() => {
+          if (!currentUser) {
+            setIsAuthModalOpen(true);
+          } else {
+            setIsUploadModalOpen(true);
+          }
+        }}
         onDeleteDocument={async (id) => {
           await deleteDocument(id);
           if (selectedDocumentId === id) {
@@ -131,6 +152,8 @@ export default function Home() {
         }}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        user={currentUser}
+        onOpenLogin={() => setIsAuthModalOpen(true)}
       />
 
       {/* Main Conversation Canvas */}
@@ -162,6 +185,12 @@ export default function Home() {
         activeSourceNum={activeSourceNum}
         onSelectSource={(num) => setActiveSourceNum(num)}
         fallbackDocumentId={selectedDocumentId}
+      />
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
       />
     </div>
   );

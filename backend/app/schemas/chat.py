@@ -16,6 +16,7 @@ class SessionResponse(BaseModel):
     id: UUID
     title: str
     document_id: Optional[UUID] = None
+    user_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

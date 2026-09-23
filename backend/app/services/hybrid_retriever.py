@@ -7,13 +7,14 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from backend.app.core.config import app_settings
-from backend.app.db.models.document import DocumentChunk
+from backend.app.db.models.document import Document, DocumentChunk
 from providers.factory import get_embeddings
 
 def search_hybrid(
     db: Session,
     query: str,
     document_id: Optional[UUID] = None,
+    user_id: Optional[str] = None,
     top_k: int = 5,
     bm25_weight: float = 0.4,
     vector_weight: float = 0.6,
@@ -21,23 +22,28 @@ def search_hybrid(
 ) -> List[Dict[str, Any]]:
     """
     Perform Hybrid Retrieval (Dense Vector + Sparse Text) using PostgreSQL & pgvector with RRF fusion.
+    Optionally scoped to specific document_id and/or user_id.
     """
     # 1. Embed query
     embeddings_model = get_embeddings()
     query_vector = embeddings_model.embed_query(query)
     vector_str = f"[{','.join(map(str, query_vector))}]"
 
-    # Filter condition
-    doc_filter_vec = "AND document_id = :doc_id" if document_id else ""
-    doc_filter_text = "AND document_id = :doc_id" if document_id else ""
-
+    # Filter conditions
+    filter_clauses = []
     params = {
         "query_vector": vector_str,
         "query_text": query,
         "limit": top_k * 3,
     }
     if document_id:
+        filter_clauses.append("document_id = :doc_id")
         params["doc_id"] = str(document_id)
+    if user_id:
+        filter_clauses.append("document_id IN (SELECT id FROM documents WHERE user_id = :user_id)")
+        params["user_id"] = str(user_id)
+
+    filter_sql = ("AND " + " AND ".join(filter_clauses)) if filter_clauses else ""
 
     # 2. Vector search query
     vector_sql = f"""
@@ -53,7 +59,7 @@ def search_hybrid(
             doc_id,
             (embedding <=> :query_vector) AS distance
         FROM document_chunks
-        WHERE embedding IS NOT NULL {doc_filter_vec}
+        WHERE embedding IS NOT NULL {filter_sql}
         ORDER BY distance ASC
         LIMIT :limit
     """
@@ -73,7 +79,7 @@ def search_hybrid(
             doc_id,
             ts_rank_cd(to_tsvector('english', text), plainto_tsquery('english', :query_text)) AS rank
         FROM document_chunks
-        WHERE to_tsvector('english', text) @@ plainto_tsquery('english', :query_text) {doc_filter_text}
+        WHERE to_tsvector('english', text) @@ plainto_tsquery('english', :query_text) {filter_sql}
         ORDER BY rank DESC
         LIMIT :limit
     """
@@ -107,6 +113,8 @@ def search_hybrid(
         fallback_query = db.query(DocumentChunk)
         if document_id:
             fallback_query = fallback_query.filter(DocumentChunk.document_id == document_id)
+        if user_id:
+            fallback_query = fallback_query.join(DocumentChunk.document).filter(Document.user_id == user_id)
         fallback_chunks = fallback_query.limit(top_k).all()
         return [
             {

@@ -9,6 +9,7 @@ export async function fetchJson<T>(endpoint: string, options: RequestInit = {}):
   }
 
   const response = await fetch(url, {
+    credentials: "include",
     ...options,
     headers,
   });

@@ -12,9 +12,11 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
+  LogIn,
 } from "lucide-react";
 import { ChatSession } from "../../types/chat";
 import { DocumentItem } from "../../types/document";
+import { UserMenu } from "../auth/UserMenu";
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -29,6 +31,13 @@ interface SidebarProps {
   onDeleteDocument: (id: string) => void;
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  user?: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+  } | null;
+  onOpenLogin?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -44,6 +53,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteDocument,
   theme,
   onToggleTheme,
+  user,
+  onOpenLogin,
 }) => {
   return (
     <aside className="sidebar" aria-label="Main Navigation Sidebar">
@@ -175,19 +186,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Sidebar Footer */}
+      {/* Sidebar Footer matching chatgpt-design.md */}
       <div className="sidebar-footer">
-        <div style={{ fontSize: "12px", color: "var(--color-hollow)" }}>
-          Construction RAG v2.0
+        {user ? (
+          <UserMenu user={user} />
+        ) : (
+          <div className="sidebar-auth-block">
+            <button
+              className="pill-login-btn"
+              onClick={onOpenLogin}
+              aria-label="Log in"
+            >
+              <LogIn size={14} />
+              <span>Log in</span>
+            </button>
+            <div className="helper-text-block">
+              Log in to save your indexed documents and conversation history.
+            </div>
+          </div>
+        )}
+
+        <div className="sidebar-footer-row">
+          <div style={{ fontSize: "12px", color: "var(--color-hollow)" }}>
+            Construction RAG
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <button
+              className="sidebar-action-btn"
+              style={{ width: "auto", padding: "4px 8px", fontSize: "12px" }}
+              onClick={onOpenUploadModal}
+              title="Upload Document"
+            >
+              <Upload size={12} />
+              <span>Upload</span>
+            </button>
+            <button
+              className="icon-btn"
+              style={{ padding: "4px" }}
+              onClick={onToggleTheme}
+              aria-label="Toggle theme"
+              title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
+            >
+              {theme === "light" ? <Moon size={13} /> : <Sun size={13} />}
+            </button>
+          </div>
         </div>
-        <button
-          className="sidebar-action-btn"
-          style={{ width: "auto", padding: "4px 10px", fontSize: "12px" }}
-          onClick={onOpenUploadModal}
-        >
-          <Upload size={12} />
-          <span>Upload</span>
-        </button>
       </div>
     </aside>
   );

@@ -38,6 +38,7 @@ class DocumentResponse(BaseModel):
     error_message: Optional[str] = None
     chunk_count: int
     docling_metadata: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

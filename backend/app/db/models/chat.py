@@ -16,15 +16,18 @@ class ChatSession(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title = Column(String(255), nullable=False, default="New Conversation")
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(String(255), ForeignKey("user.id", ondelete="CASCADE"), nullable=True, index=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    user = relationship("User", back_populates="chat_sessions")
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan", order_by="ChatMessage.created_at")
 
     __table_args__ = (
         Index("idx_chat_sessions_created_at", "created_at"),
+        Index("idx_chat_sessions_user_id", "user_id"),
     )
 
 

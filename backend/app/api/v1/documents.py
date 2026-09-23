@@ -15,8 +15,10 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from backend.app.db.session import get_db, SessionLocal
 from backend.app.db.models.document import Document, DocumentChunk
+from backend.app.db.models.user import User
 from backend.app.schemas.document import DocumentResponse, ContentTypeOption
 from backend.app.core.config import app_settings
+from backend.app.core.auth import get_current_user
 from backend.app.services.docling_extractor import extract_document
 from backend.app.services.image_summarizer import summarize_images
 from backend.app.services.chunker import chunk_document
@@ -121,10 +123,12 @@ async def upload_document(
     chunk_max_tokens: int = Form(512),
     chunk_merge_peers: bool = Form(True),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Upload a PDF document with custom extraction details.
     Content type options: auto_detect, text_only, tables, images, scanned, mixed.
+    Scoped to current_user.
     """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
@@ -148,6 +152,7 @@ async def upload_document(
         content_type=content_type.value,
         title=title or file.filename,
         description=description,
+        user_id=current_user.id,
         status="uploaded",
         chunk_count=0,
     )
@@ -169,24 +174,35 @@ async def upload_document(
 
 
 @router.get("", response_model=List[DocumentResponse])
-def list_documents(db: Session = Depends(get_db)):
-    """List all uploaded documents."""
-    return db.query(Document).order_by(Document.created_at.desc()).all()
+def list_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all uploaded documents belonging to current user."""
+    return db.query(Document).filter(Document.user_id == current_user.id).order_by(Document.created_at.desc()).all()
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-def get_document(document_id: UUID, db: Session = Depends(get_db)):
-    """Get single document details."""
-    doc = db.query(Document).filter(Document.id == document_id).first()
+def get_document(
+    document_id: UUID, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get single document details owned by current user."""
+    doc = db.query(Document).filter(Document.id == document_id, Document.user_id == current_user.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
     return doc
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(document_id: UUID, db: Session = Depends(get_db)):
-    """Delete a document and its indexed chunks."""
-    doc = db.query(Document).filter(Document.id == document_id).first()
+def delete_document(
+    document_id: UUID, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a document and its indexed chunks owned by current user."""
+    doc = db.query(Document).filter(Document.id == document_id, Document.user_id == current_user.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
@@ -204,9 +220,13 @@ def delete_document(document_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/{document_id}/file")
-def get_document_file(document_id: UUID, db: Session = Depends(get_db)):
-    """Serve the raw PDF file for viewing/highlighting in browser."""
-    doc = db.query(Document).filter(Document.id == document_id).first()
+def get_document_file(
+    document_id: UUID, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Serve the raw PDF file for viewing/highlighting in browser (owned by current user)."""
+    doc = db.query(Document).filter(Document.id == document_id, Document.user_id == current_user.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
     

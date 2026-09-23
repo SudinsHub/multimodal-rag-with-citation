@@ -42,11 +42,12 @@ def execute_rag(
     db: Session,
     query: str,
     document_id: Optional[UUID] = None,
+    user_id: Optional[str] = None,
     top_k: int = 5,
 ) -> Dict[str, Any]:
     """
     Run the end-to-end RAG pipeline:
-    1. Retrieve candidates via hybrid search (pgvector + FTS with RRF)
+    1. Retrieve candidates via hybrid search (pgvector + FTS with RRF) scoped by user_id
     2. Format prompt context
     3. Generate response with inline [Source N]
     4. Compile structured citation proofs
@@ -55,6 +56,7 @@ def execute_rag(
         db=db,
         query=query,
         document_id=document_id,
+        user_id=user_id,
         top_k=top_k,
         bm25_weight=app_settings.BM25_WEIGHT,
         vector_weight=app_settings.VECTOR_WEIGHT,
