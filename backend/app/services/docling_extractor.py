@@ -19,7 +19,7 @@ def extract_document(pdf_path: Path, content_type: str = "auto_detect") -> Tuple
     # Table structure recognition
     if content_type in ("tables", "mixed", "auto_detect"):
         pipeline_options.do_table_structure = True
-        pipeline_options.table_structure_options.mode = TableFormerMode.ACCURATE
+        pipeline_options.table_structure_options.mode = TableFormerMode.FAST
     else:
         pipeline_options.do_table_structure = False
 
