@@ -1,5 +1,8 @@
-# Environment
+# Environment & Secrets
 .env
+.env.local
+.env.*.local
+!.env.example
 
 # Python
 __pycache__/
@@ -8,18 +11,65 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+*.spec
 
-# Data (persistent stores)
+# Python Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Node & Frontend (Safety net for monorepo)
+node_modules/
+.next/
+out/
+.npm/
+
+# Data (persistent stores & uploads)
+data/*
+!data/.gitkeep
 data/chroma/
 data/docstore/
+data/uploads/
 
-# Ollama volumes
+# PDF test files
+pdfs/*
+!pdfs/.gitkeep
+
+# Ollama & Database volumes / files
 ollama_data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
+# IDEs & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
 # OS
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+Desktop.ini
