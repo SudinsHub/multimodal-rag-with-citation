@@ -5,6 +5,8 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: construction_rag_postgres
+    restart: unless-stopped
+    mem_limit: 512m
     ports:
       - "5432:5432"
     environment:
@@ -29,7 +31,10 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: construction_rag_backend
-    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir backend --reload-dir config --reload-dir providers
+    restart: unless-stopped
+    mem_limit: 3200m
+    memswap_limit: 6000m
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     volumes:
@@ -45,6 +50,9 @@ services:
       - PYTHONPATH=/app
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION}
+      - OMP_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - TORCH_NUM_THREADS=1
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,12 +67,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: construction_rag_frontend
+    restart: unless-stopped
+    mem_limit: 384m
     ports:
       - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
