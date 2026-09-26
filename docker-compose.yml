@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     mem_limit: 512m
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-127.0.0.1:5433}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -36,7 +36,7 @@ services:
     memswap_limit: 6000m
     command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-127.0.0.1:8000}:8000"
     volumes:
       - ./backend:/app/backend
       - ./config:/app/config
@@ -66,17 +66,20 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+        NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL:-}
     container_name: construction_rag_frontend
     restart: unless-stopped
     mem_limit: 384m
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-127.0.0.1:3001}:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-supersecretbetterauthkey_at_least_32_chars_12345}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
-      - NEXT_PUBLIC_BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3001}
+      - NEXT_PUBLIC_BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3001}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     depends_on:

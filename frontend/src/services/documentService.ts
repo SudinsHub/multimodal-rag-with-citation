@@ -32,7 +32,7 @@ export const documentService = {
   },
 
   getPdfFileUrl(id: string): string {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const base = process.env.NEXT_PUBLIC_API_URL || "";
     return `${base}/api/v1/documents/${id}/file`;
   },
 };

@@ -1,0 +1,45 @@
+# Caddy configuration for citerag.naimulworks.me
+# Append or include this block in /etc/caddy/Caddyfile on your VPS (46.224.86.196)
+
+citerag.naimulworks.me {
+    # Request body limit for PDF document uploads (default 50MB)
+    request_body {
+        max_size 50MB
+    }
+
+    # Fast compression
+    encode zstd gzip
+
+    # 1. FastAPI Backend API & Documentation
+    handle /api/v1/* {
+        reverse_proxy 127.0.0.1:8000 {
+            header_up Host {upstream_hostport}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    handle /docs* {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    handle /openapi.json {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    # 2. Next.js Frontend Application & Better-Auth (/api/auth/*)
+    handle {
+        reverse_proxy 127.0.0.1:3001 {
+            header_up Host {upstream_hostport}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Logging
+    log {
+        output file /var/log/caddy/citerag.access.log
+    }
+}

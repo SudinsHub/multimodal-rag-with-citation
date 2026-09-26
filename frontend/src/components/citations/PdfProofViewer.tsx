@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { BoundingBox } from "../../types/citation";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 interface PdfProofViewerProps {
   documentId: string;

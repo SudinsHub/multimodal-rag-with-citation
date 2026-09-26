@@ -207,10 +207,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         <div className="sidebar-footer-row">
-          <div style={{ fontSize: "12px", color: "var(--color-hollow)" }}>
+          <div className="sidebar-footer-brand">
             Construction RAG
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <div className="sidebar-footer-actions">
             <button
               className="sidebar-action-btn"
               style={{ width: "auto", padding: "4px 8px", fontSize: "12px" }}

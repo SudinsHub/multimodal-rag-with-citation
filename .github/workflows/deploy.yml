@@ -1,0 +1,115 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - bugfix-guardrailing
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Select branch to deploy'
+        required: true
+        default: 'bugfix-guardrailing'
+        type: choice
+        options:
+          - bugfix-guardrailing
+          - main
+          - custom
+      custom_branch:
+        description: 'Custom branch name (only used if "custom" is selected above)'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy application via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST || '46.224.86.196' }}
+          username: ${{ secrets.VPS_USER || 'root' }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+
+            # 1. Resolve target branch
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              if [ "${{ github.event.inputs.branch }}" = "custom" ]; then
+                TARGET_BRANCH="${{ github.event.inputs.custom_branch }}"
+              else
+                TARGET_BRANCH="${{ github.event.inputs.branch }}"
+              fi
+            else
+              TARGET_BRANCH="${{ github.ref_name }}"
+            fi
+
+            if [ -z "$TARGET_BRANCH" ]; then
+              TARGET_BRANCH="bugfix-guardrailing"
+            fi
+
+            echo "========================================="
+            echo "🚀 Starting Deployment"
+            echo "🌿 Target Branch: $TARGET_BRANCH"
+            echo "📍 Target Host: 46.224.86.196"
+            echo "🌐 Target Domain: citerag.naimulworks.me"
+            echo "========================================="
+
+            DEPLOY_DIR="$HOME/citation-rag"
+            REPO_URL="https://github.com/SudinsHub/multimodal-rag-with-citation.git"
+
+            # 2. Clone or update repository
+            if [ ! -d "$DEPLOY_DIR/.git" ]; then
+              echo "📁 Repository not found. Cloning to $DEPLOY_DIR..."
+              git clone "$REPO_URL" "$DEPLOY_DIR"
+              cd "$DEPLOY_DIR"
+            else
+              echo "📁 Navigating to $DEPLOY_DIR..."
+              cd "$DEPLOY_DIR"
+              echo "🔄 Fetching latest changes from remote..."
+              git fetch --all --prune
+            fi
+
+            # 3. Check out target branch & pull
+            echo "🌿 Checking out branch: $TARGET_BRANCH..."
+            git checkout "$TARGET_BRANCH"
+            git pull origin "$TARGET_BRANCH"
+
+            # 4. Check for .env file
+            if [ ! -f "$DEPLOY_DIR/.env" ]; then
+              if [ -f "$DEPLOY_DIR/.env.example" ]; then
+                echo "⚠️ Notice: .env file was missing. Initialized from .env.example."
+                cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env"
+              else
+                echo "❌ Error: Neither .env nor .env.example found in $DEPLOY_DIR."
+                exit 1
+              fi
+            fi
+
+            # 5. Build and launch Docker Compose stack
+            echo "🐳 Building and spinning up containers..."
+            docker compose down --remove-orphans || true
+            docker compose up -d --build
+
+            # 6. Show running containers
+            echo "📊 Docker containers status:"
+            docker compose ps
+
+            # 7. Clean up unused build cache and images to save VPS disk space
+            echo "🧹 Pruning old dangling images..."
+            docker image prune -f
+
+            # 8. Reload Caddy if active
+            if systemctl is-active --quiet caddy; then
+              echo "🔄 Reloading Caddy web server..."
+              systemctl reload caddy || true
+            fi
+
+            echo "========================================="
+            echo "🎉 Deployment of $TARGET_BRANCH finished successfully!"
+            echo "🌐 Accessible at: https://citerag.naimulworks.me"
+            echo "========================================="

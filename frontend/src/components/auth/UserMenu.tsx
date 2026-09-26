@@ -15,10 +15,22 @@ interface UserMenuProps {
 
 export const UserMenu: React.FC<UserMenuProps> = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Reset image error state whenever user or user.image changes
+  useEffect(() => {
+    setImageError(false);
+  }, [user.image]);
+
   const displayName = user.name || user.email?.split("@")[0] || "Account";
-  const initials = displayName.slice(0, 2).toUpperCase();
+  const initials = (
+    displayName.includes(" ")
+      ? displayName.split(" ").map((n) => n[0]).filter(Boolean).slice(0, 2).join("")
+      : displayName.slice(0, 2)
+  ).toUpperCase();
+
+  const hasImage = Boolean(user.image && !imageError);
 
   // Close when clicking outside
   useEffect(() => {
@@ -51,19 +63,31 @@ export const UserMenu: React.FC<UserMenuProps> = ({ user }) => {
         <div className="user-popover-card">
           <div className="user-popover-header">
             <div className="user-avatar-circle">
-              {user.image ? (
-                <img src={user.image} alt={displayName} className="user-avatar-img" />
+              {hasImage ? (
+                <img
+                  src={user.image!}
+                  alt={displayName}
+                  className="user-avatar-img"
+                  referrerPolicy="no-referrer"
+                  onError={() => setImageError(true)}
+                />
               ) : (
                 <span>{initials}</span>
               )}
             </div>
             <div className="user-popover-info">
-              <span className="user-popover-name">{displayName}</span>
-              <span className="user-popover-email">{user.email}</span>
+              <span className="user-popover-name" title={displayName}>
+                {displayName}
+              </span>
+              {user.email && (
+                <span className="user-popover-email" title={user.email}>
+                  {user.email}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="hairline-divider" style={{ margin: "6px 0" }} />
+          <div className="hairline-divider" style={{ margin: "8px 0" }} />
 
           <button
             className="user-popover-item"
@@ -82,14 +106,22 @@ export const UserMenu: React.FC<UserMenuProps> = ({ user }) => {
         aria-label="Account menu"
       >
         <div className="user-avatar-circle">
-          {user.image ? (
-            <img src={user.image} alt={displayName} className="user-avatar-img" />
+          {hasImage ? (
+            <img
+              src={user.image!}
+              alt={displayName}
+              className="user-avatar-img"
+              referrerPolicy="no-referrer"
+              onError={() => setImageError(true)}
+            />
           ) : (
             <span>{initials}</span>
           )}
         </div>
         <div className="user-trigger-info">
-          <span className="user-trigger-name">{displayName}</span>
+          <span className="user-trigger-name" title={displayName}>
+            {displayName}
+          </span>
         </div>
         <div className="user-trigger-badge">Free</div>
       </button>

@@ -27,7 +27,14 @@ class AppSettings(BaseSettings):
     EMBEDDING_DIMENSION: int = int(os.getenv("EMBEDDING_DIMENSION", "768"))
     
     # CORS
-    CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: Union[List[str], str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "https://citerag.naimulworks.me",
+        "http://citerag.naimulworks.me",
+    ]
 
     @field_validator("CORS_ORIGINS", mode="after")
     def parse_cors(cls, v):

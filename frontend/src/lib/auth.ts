@@ -16,8 +16,16 @@ export const auth = betterAuth({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       enabled: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+      overrideUserInfoOnSignIn: true,
+      mapProfileToUser: (profile) => {
+        return {
+          name: profile.name,
+          email: profile.email,
+          image: profile.picture || (profile as any).avatar_url || (profile as any).image,
+        };
+      },
     },
   },
   secret: process.env.BETTER_AUTH_SECRET || "development-secret-key-at-least-32-chars-long",
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3001",
 });
