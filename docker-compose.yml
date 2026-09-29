@@ -72,6 +72,7 @@ services:
     container_name: construction_rag_frontend
     restart: unless-stopped
     mem_limit: 384m
+    command: node server.js
     ports:
       - "${FRONTEND_PORT:-127.0.0.1:3001}:3000"
     environment:

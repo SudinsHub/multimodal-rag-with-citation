@@ -33,8 +33,7 @@ ENV HOSTNAME="0.0.0.0"
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/migrate.js ./migrate.js
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "node migrate.js && node server.js"]
+CMD ["node", "server.js"]
