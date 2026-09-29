@@ -93,15 +93,32 @@ jobs:
             # 5. Build and launch Docker Compose stack
             echo "🐳 Building and spinning up containers..."
             docker compose down --remove-orphans || true
-            docker compose up -d --build
+            
+            # Build sequentially to avoid concurrent memory/disk exhaustion on 4GB VPS
+            echo "🔨 Building backend image..."
+            if ! docker compose build backend; then
+              echo "⚠️ Backend build failed. Pruning corrupted builder cache and retrying..."
+              docker builder prune -a -f
+              docker compose build --no-cache backend
+            fi
+
+            echo "🔨 Building frontend image..."
+            if ! docker compose build frontend; then
+              echo "⚠️ Frontend build failed. Retrying without cache..."
+              docker compose build --no-cache frontend
+            fi
+
+            echo "🚀 Starting containers..."
+            docker compose up -d
 
             # 6. Show running containers
             echo "📊 Docker containers status:"
             docker compose ps
 
             # 7. Clean up unused build cache and images to save VPS disk space
-            echo "🧹 Pruning old dangling images..."
+            echo "🧹 Pruning old dangling images and builder cache..."
             docker image prune -f
+            docker builder prune -f --keep-storage 2GB
 
             # 8. Reload Caddy if active
             if systemctl is-active --quiet caddy; then
