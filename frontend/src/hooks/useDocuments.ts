@@ -8,11 +8,19 @@ export function useDocuments() {
   const documentsQuery = useQuery({
     queryKey: ["documents"],
     queryFn: documentService.listDocuments,
-    // Poll every 3 seconds while documents are processing
+    // Poll every 3 seconds only while documents are actively processing; avoid polling when idle or errored
     refetchInterval: (query) => {
+      if (query.state.status === "error") return false;
       const data = query.state.data;
       const isProcessing = data?.some((d) => d.status === "processing" || d.status === "uploaded");
-      return isProcessing ? 3000 : 15000;
+      return isProcessing ? 3000 : false;
+    },
+    retry: (failureCount, error: any) => {
+      // Do not retry repeatedly if unauthenticated
+      if (error?.message?.includes("401") || error?.message?.includes("Authentication required")) {
+        return false;
+      }
+      return failureCount < 2;
     },
   });
 

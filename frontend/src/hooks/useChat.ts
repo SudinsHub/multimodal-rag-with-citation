@@ -7,12 +7,24 @@ export function useChat(activeSessionId: string | null) {
   const sessionsQuery = useQuery({
     queryKey: ["chat-sessions"],
     queryFn: chatService.listSessions,
+    retry: (failureCount, error: any) => {
+      if (error?.message?.includes("401") || error?.message?.includes("Authentication required")) {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 
   const messagesQuery = useQuery({
     queryKey: ["chat-messages", activeSessionId],
     queryFn: () => (activeSessionId ? chatService.getMessages(activeSessionId) : Promise.resolve([])),
     enabled: Boolean(activeSessionId),
+    retry: (failureCount, error: any) => {
+      if (error?.message?.includes("401") || error?.message?.includes("Authentication required")) {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 
   const createSessionMutation = useMutation({

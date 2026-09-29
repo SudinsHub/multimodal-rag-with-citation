@@ -15,8 +15,8 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     email_verified = Column("emailVerified", Boolean, default=False, nullable=False)
     image = Column(String, nullable=True)
-    created_at = Column("createdAt", DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column("updatedAt", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column("createdAt", DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at = Column("updatedAt", DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
@@ -30,11 +30,11 @@ class Session(Base):
     id = Column(String, primary_key=True)
     user_id = Column("userId", String, ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True)
     token = Column(String, unique=True, nullable=False, index=True)
-    expires_at = Column("expiresAt", DateTime, nullable=False)
+    expires_at = Column("expiresAt", DateTime(timezone=True), nullable=False)
     ip_address = Column("ipAddress", String, nullable=True)
     user_agent = Column("userAgent", String, nullable=True)
-    created_at = Column("createdAt", DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column("updatedAt", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column("createdAt", DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at = Column("updatedAt", DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="sessions")

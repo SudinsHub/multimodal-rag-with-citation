@@ -4,12 +4,42 @@ Validates Better Auth session tokens against PostgreSQL session table.
 Supports both Cookie ('better-auth.session_token') and Bearer Authorization headers.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+import logging
 from typing import Optional
+from urllib.parse import unquote
 from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from backend.app.db.session import get_db
 from backend.app.db.models.user import User, Session as UserSession
+
+logger = logging.getLogger(__name__)
+
+
+def clean_session_token(raw_token: str) -> str:
+    """
+    Clean and extract the raw session token from a cookie or header value.
+    
+    Better Auth signs cookies as `<token>.<signature>` (and URL-encodes it).
+    Express-style signed cookies use `s:<token>.<signature>`.
+    PostgreSQL stores the raw, un-signed alphanumeric token in the session table.
+    """
+    if not raw_token:
+        return ""
+    
+    token = unquote(raw_token).strip().strip('"').strip("'")
+    
+    # Strip express-style prefix if present
+    if token.startswith("s:"):
+        token = token[2:]
+        
+    # Strip Better Auth HMAC signature suffix (.signature)
+    if "." in token:
+        token = token.split(".")[0]
+        
+    return token.strip()
+
 
 def extract_session_token(request: Request) -> Optional[str]:
     """Extract Better Auth session token from cookies or Authorization header."""
@@ -17,27 +47,23 @@ def extract_session_token(request: Request) -> Optional[str]:
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
-        if token:
-            return token
+        cleaned = clean_session_token(token)
+        if cleaned:
+            return cleaned
 
-    # 2. Check Better Auth cookies
-    cookie_token = request.cookies.get("better-auth.session_token")
-    if cookie_token:
-        # In case the cookie value is signed with prefix (e.g. s:... or standard token)
-        # Better Auth sets the token directly or signed; standard token is raw
-        if "." in cookie_token and cookie_token.startswith("s:"):
-            # strip express-style cookie signing if present
-            cookie_token = cookie_token[2:].split(".")[0]
-        return cookie_token
-
-    # 3. Check secure cookie variant for HTTPS/production
-    secure_cookie = request.cookies.get("__Secure-better-auth.session_token")
-    if secure_cookie:
-        if "." in secure_cookie and secure_cookie.startswith("s:"):
-            secure_cookie = secure_cookie[2:].split(".")[0]
-        return secure_cookie
+    # 2. Check Better Auth cookies (standard & secure production prefix)
+    for cookie_name in (
+        "__Secure-better-auth.session_token",
+        "better-auth.session_token",
+    ):
+        raw_cookie = request.cookies.get(cookie_name)
+        if raw_cookie:
+            cleaned = clean_session_token(raw_cookie)
+            if cleaned:
+                return cleaned
 
     return None
+
 
 def get_optional_current_user(
     request: Request,
@@ -48,16 +74,22 @@ def get_optional_current_user(
     if not token:
         return None
 
+    # Compare expiry against database server time (func.now())
     session_record = (
         db.query(UserSession)
-        .filter(UserSession.token == token, UserSession.expires_at > datetime.utcnow())
+        .filter(
+            UserSession.token == token,
+            UserSession.expires_at > func.now(),
+        )
         .first()
     )
 
     if not session_record or not session_record.user:
+        logger.debug(f"No valid session record found for extracted token: {token[:8]}...")
         return None
 
     return session_record.user
+
 
 def get_current_user(
     request: Request,
@@ -72,3 +104,4 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
