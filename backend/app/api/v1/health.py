@@ -19,7 +19,9 @@ def health_check(db: Session = Depends(get_db)):
         res = db.execute(text("SELECT extname FROM pg_extension WHERE extname = 'vector';")).fetchone()
         pgvector_installed = bool(res)
     except Exception as e:
-        db_status = f"unhealthy: {e}"
+        import logging
+        logging.getLogger("rag_app").warning(f"Database health check failed: {e}")
+        db_status = "unavailable"
 
     return {
         "status": "ok" if db_status == "healthy" else "degraded",

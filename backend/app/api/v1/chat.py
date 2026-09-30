@@ -173,12 +173,38 @@ def send_message(
         db.commit()
 
     # 5. Execute RAG pipeline scoped to current_user
-    rag_output = execute_rag(
-        db=db,
-        query=payload.message,
-        document_id=target_doc_id,
-        user_id=current_user.id,
-    )
+    try:
+        rag_output = execute_rag(
+            db=db,
+            query=payload.message,
+            document_id=target_doc_id,
+            user_id=current_user.id,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error during RAG execution for session {session_id}: {e}")
+        err_lower = str(e).lower()
+        if "quota" in err_lower or "429" in err_lower or "resourceexhausted" in err_lower:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="The AI service is temporarily experiencing high demand (rate quota reached). Please wait a moment and try asking again."
+            )
+        elif "safety" in err_lower or "blocked" in err_lower:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The question could not be answered due to content safety guidelines. Please rephrase your query."
+            )
+        elif "api_key" in err_lower or "apikey" in err_lower:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="The AI service is currently unavailable. Please contact the administrator or try again later."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to generate response at this time. Please try asking again shortly."
+            )
 
     citations_dicts = [c.model_dump() for c in rag_output["citations"]]
 

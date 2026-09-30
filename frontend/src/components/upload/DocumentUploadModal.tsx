@@ -3,6 +3,7 @@
 import React, { useState, useRef } from "react";
 import { X, UploadCloud, FileText, Table, Image as ImageIcon, Scan, Layers, Sparkles } from "lucide-react";
 import { ContentTypeOption, DocumentDetailsPayload } from "../../types/document";
+import { formatUserErrorMessage } from "../../lib/errorHandler";
 
 interface DocumentUploadModalProps {
   isOpen: boolean;
@@ -125,7 +126,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       setDescription("");
       onClose();
     } catch (err: any) {
-      setError(err.message || "Upload failed. Please try again.");
+      setError(formatUserErrorMessage(err, "upload"));
     } finally {
       setIsSubmitting(false);
     }

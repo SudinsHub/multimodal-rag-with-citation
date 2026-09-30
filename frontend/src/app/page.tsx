@@ -10,6 +10,7 @@ import { useDocuments } from "../hooks/useDocuments";
 import { useChat } from "../hooks/useChat";
 import { CitationProof } from "../types/citation";
 import { useSession } from "../lib/auth-client";
+import { formatUserErrorMessage } from "../lib/errorHandler";
 
 export default function Home() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -17,9 +18,10 @@ export default function Home() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: "error" | "info" } | null>(null);
 
   // Authentication session
-  const { data: sessionData, isPending: isSessionLoading } = useSession();
+  const { data: sessionData } = useSession();
   const currentUser = sessionData?.user || null;
 
   // Citation drawer state
@@ -27,8 +29,8 @@ export default function Home() {
   const [drawerCitations, setDrawerCitations] = useState<CitationProof[]>([]);
   const [activeSourceNum, setActiveSourceNum] = useState<number | null>(null);
 
-  // Hooks
-  const { documents, uploadDocument, deleteDocument } = useDocuments();
+  // Hooks - enable only when authenticated to prevent premature 401 calls
+  const { documents, uploadDocument, deleteDocument } = useDocuments(Boolean(currentUser));
   const {
     sessions,
     messages,
@@ -37,7 +39,7 @@ export default function Home() {
     deleteSession,
     sendMessage,
     isSending,
-  } = useChat(activeSessionId);
+  } = useChat(activeSessionId, Boolean(currentUser));
 
   // Initialize theme from preference or localStorage
   useEffect(() => {
@@ -50,6 +52,14 @@ export default function Home() {
       document.documentElement.setAttribute("data-theme", "dark");
     }
   }, []);
+
+  // Auto-dismiss notification after 5 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const handleToggleTheme = () => {
     const nextTheme = theme === "light" ? "dark" : "light";
@@ -76,24 +86,31 @@ export default function Home() {
         documentId: selectedDocumentId || undefined,
       });
       setActiveSessionId(newSession.id);
-    } catch (e) {
-      console.error("Failed to create session:", e);
+    } catch (e: any) {
+      setNotification({
+        message: formatUserErrorMessage(e, "chat"),
+        type: "error",
+      });
     }
   };
 
   const handleSendMessage = async (text: string) => {
     if (!currentUser) {
       setIsAuthModalOpen(true);
-      return;
+      throw new Error("Please log in to chat and query documents.");
     }
     let currentSessionId = activeSessionId;
     if (!currentSessionId) {
-      const newSession = await createSession({
-        title: "New Conversation",
-        documentId: selectedDocumentId || undefined,
-      });
-      currentSessionId = newSession.id;
-      setActiveSessionId(newSession.id);
+      try {
+        const newSession = await createSession({
+          title: "New Conversation",
+          documentId: selectedDocumentId || undefined,
+        });
+        currentSessionId = newSession.id;
+        setActiveSessionId(newSession.id);
+      } catch (err: any) {
+        throw new Error(formatUserErrorMessage(err, "chat"));
+      }
     }
 
     try {
@@ -106,8 +123,10 @@ export default function Home() {
       if (res.citations && res.citations.length > 0) {
         setDrawerCitations(res.citations);
       }
+      return res;
     } catch (e) {
-      console.error("Failed sending message:", e);
+      // Re-throw so ChatWorkspace displays it in the error/guardrail banner
+      throw e;
     }
   };
 
@@ -122,6 +141,35 @@ export default function Home() {
 
   return (
     <div className="app-shell">
+      {/* Toast Notification */}
+      {notification && (
+        <div style={{
+          position: "fixed",
+          top: "16px",
+          right: "16px",
+          zIndex: 9999,
+          background: notification.type === "error" ? "rgba(239, 68, 68, 0.95)" : "var(--color-ink)",
+          color: "#fff",
+          padding: "10px 16px",
+          borderRadius: "8px",
+          fontSize: "13px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          maxWidth: "360px",
+        }}>
+          <span>{notification.message}</span>
+          <button
+            onClick={() => setNotification(null)}
+            style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: "2px" }}
+            aria-label="Close notification"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Sidebar navigation */}
       <Sidebar
         sessions={sessions}
@@ -129,9 +177,16 @@ export default function Home() {
         onSelectSession={(id) => setActiveSessionId(id)}
         onNewChat={handleNewChat}
         onDeleteSession={async (id) => {
-          await deleteSession(id);
-          if (activeSessionId === id) {
-            setActiveSessionId(null);
+          try {
+            await deleteSession(id);
+            if (activeSessionId === id) {
+              setActiveSessionId(null);
+            }
+          } catch (err: any) {
+            setNotification({
+              message: formatUserErrorMessage(err, "general"),
+              type: "error",
+            });
           }
         }}
         documents={documents}
@@ -145,9 +200,16 @@ export default function Home() {
           }
         }}
         onDeleteDocument={async (id) => {
-          await deleteDocument(id);
-          if (selectedDocumentId === id) {
-            setSelectedDocumentId(null);
+          try {
+            await deleteDocument(id);
+            if (selectedDocumentId === id) {
+              setSelectedDocumentId(null);
+            }
+          } catch (err: any) {
+            setNotification({
+              message: formatUserErrorMessage(err, "document"),
+              type: "error",
+            });
           }
         }}
         theme={theme}
@@ -166,6 +228,8 @@ export default function Home() {
         selectedDocument={selectedDocument}
         onOpenCitationDrawer={handleOpenCitationDrawer}
         isDrawerOpen={isCitationDrawerOpen}
+        onNewChat={handleNewChat}
+        onOpenLogin={() => setIsAuthModalOpen(true)}
       />
 
       {/* Document Upload & Details Selection Modal */}

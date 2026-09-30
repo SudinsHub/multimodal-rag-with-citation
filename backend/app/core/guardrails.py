@@ -113,7 +113,7 @@ def validate_pdf_preflight(file_path: Path, max_pages: int = 50, max_file_size_m
         logger.warning(f"PDF preflight validation error: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not read PDF structure: {str(e)}"
+            detail="Unable to read PDF structure. The file may be damaged, password-protected, or in an unsupported format."
         )
 
 

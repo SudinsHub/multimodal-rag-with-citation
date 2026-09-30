@@ -1,14 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { chatService } from "../services/chatService";
 
-export function useChat(activeSessionId: string | null) {
+export function useChat(activeSessionId: string | null, isEnabled: boolean = true) {
   const queryClient = useQueryClient();
 
   const sessionsQuery = useQuery({
     queryKey: ["chat-sessions"],
     queryFn: chatService.listSessions,
+    enabled: isEnabled,
     retry: (failureCount, error: any) => {
-      if (error?.message?.includes("401") || error?.message?.includes("Authentication required")) {
+      if (error?.message?.includes("401") || error?.message?.includes("Authentication required") || error?.message?.includes("log in")) {
         return false;
       }
       return failureCount < 2;
@@ -18,9 +19,9 @@ export function useChat(activeSessionId: string | null) {
   const messagesQuery = useQuery({
     queryKey: ["chat-messages", activeSessionId],
     queryFn: () => (activeSessionId ? chatService.getMessages(activeSessionId) : Promise.resolve([])),
-    enabled: Boolean(activeSessionId),
+    enabled: isEnabled && Boolean(activeSessionId),
     retry: (failureCount, error: any) => {
-      if (error?.message?.includes("401") || error?.message?.includes("Authentication required")) {
+      if (error?.message?.includes("401") || error?.message?.includes("Authentication required") || error?.message?.includes("log in")) {
         return false;
       }
       return failureCount < 2;

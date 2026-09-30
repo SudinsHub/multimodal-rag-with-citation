@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import { signIn, signUp } from "../../lib/auth-client";
+import { formatUserErrorMessage } from "../../lib/errorHandler";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -28,32 +29,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setErrorMessage("Please enter your email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setErrorMessage("Please enter a valid email address (e.g. name@example.com).");
+      return;
+    }
+    if (!password) {
+      setErrorMessage("Please enter your password.");
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMessage("Password must be at least 6 characters long.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (mode === "signup") {
         if (!name.trim()) {
-          setErrorMessage("Please enter your name.");
+          setErrorMessage("Please enter your full name.");
           setLoading(false);
           return;
         }
         const res = await signUp.email({
-          email,
+          email: trimmedEmail,
           password,
-          name,
+          name: name.trim(),
         });
         if (res?.error) {
-          setErrorMessage(res.error.message || "Failed to sign up.");
+          setErrorMessage(formatUserErrorMessage(res.error, "auth"));
           setLoading(false);
           return;
         }
       } else {
         const res = await signIn.email({
-          email,
+          email: trimmedEmail,
           password,
         });
         if (res?.error) {
-          setErrorMessage(res.error.message || "Invalid email or password.");
+          setErrorMessage(formatUserErrorMessage(res.error, "auth"));
           setLoading(false);
           return;
         }
@@ -64,7 +84,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onClose();
       window.location.reload();
     } catch (err: any) {
-      setErrorMessage(err.message || "An unexpected error occurred.");
+      setErrorMessage(formatUserErrorMessage(err, "auth"));
       setLoading(false);
     }
   };
@@ -73,12 +93,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMessage(null);
     setGoogleLoading(true);
     try {
-      await signIn.social({
+      const res = await signIn.social({
         provider: "google",
         callbackURL: window.location.href,
       });
+      if (res?.error) {
+        setErrorMessage(formatUserErrorMessage(res.error, "auth"));
+        setGoogleLoading(false);
+      }
     } catch (err: any) {
-      setErrorMessage(err.message || "Google sign-in is not configured or failed.");
+      setErrorMessage(formatUserErrorMessage(err, "auth"));
       setGoogleLoading(false);
     }
   };

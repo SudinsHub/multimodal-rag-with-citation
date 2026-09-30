@@ -126,7 +126,21 @@ def process_document_background(
             doc_record = db.query(Document).filter(Document.id == doc_id).first()
             if doc_record:
                 doc_record.status = "failed"
-                doc_record.error_message = str(e)
+                err_text = str(e).lower()
+                if "memory" in err_text or "killed" in err_text:
+                    user_msg = "Document processing exceeded server memory limits. Try uploading in Text Only mode."
+                elif "ocr" in err_text or "tesseract" in err_text:
+                    user_msg = "OCR processing failed on scanned pages. Try uploading with standard text options."
+                elif "table" in err_text:
+                    user_msg = "Table structure recognition encountered an issue. Try uploading in Text Only mode."
+                elif "embed" in err_text:
+                    user_msg = "Embedding service temporarily unavailable. Please try re-uploading."
+                elif "password" in err_text or "encrypt" in err_text:
+                    user_msg = "Password-protected PDFs cannot be indexed."
+                else:
+                    user_msg = "Unable to parse document layout. The PDF may be damaged or in an unsupported format."
+                
+                doc_record.error_message = user_msg
                 db.commit()
         finally:
             db.close()
@@ -204,7 +218,11 @@ async def upload_document(
     except Exception as e:
         if saved_path.exists():
             saved_path.unlink()
-        raise HTTPException(status_code=500, detail=f"Failed to save upload: {e}")
+        logger.exception(f"Failed to save upload: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save uploaded file on server. Please try again."
+        )
 
     # 4. Fast PDF Pre-flight Check (magic bytes, password encryption, max 50 pages)
     try:

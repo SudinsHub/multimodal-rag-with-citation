@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ArrowUp, Bookmark, Sparkles, FileText, Check, AlertCircle, X } from "lucide-react";
+import { ArrowUp, Bookmark, Sparkles, FileText, AlertCircle, X, ShieldAlert, LogIn, Plus } from "lucide-react";
 import { ChatMessage } from "../../types/chat";
 import { CitationProof } from "../../types/citation";
 import { DocumentItem } from "../../types/document";
+import { formatUserErrorMessage } from "../../lib/errorHandler";
 
 interface ChatWorkspaceProps {
   messages: ChatMessage[];
@@ -15,6 +16,8 @@ interface ChatWorkspaceProps {
   selectedDocument: DocumentItem | null;
   onOpenCitationDrawer: (citations: CitationProof[], sourceNum?: number) => void;
   isDrawerOpen: boolean;
+  onNewChat?: () => void;
+  onOpenLogin?: () => void;
 }
 
 export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
@@ -26,6 +29,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   selectedDocument,
   onOpenCitationDrawer,
   isDrawerOpen,
+  onNewChat,
+  onOpenLogin,
 }) => {
   const [inputText, setInputText] = useState("");
   const [guardrailError, setGuardrailError] = useState<string | null>(null);
@@ -65,7 +70,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     if (!trimmed || isSending) return;
 
     if (isSessionQuotaExhausted) {
-      setGuardrailError(`Session prompt limit reached: You have used all ${MAX_SESSION_PROMPTS} prompts for this chat. Please start a New Chat from the sidebar to continue.`);
+      setGuardrailError(`Session prompt limit reached: You have used all ${MAX_SESSION_PROMPTS} prompts for this chat. Please start a New Chat to continue.`);
       return;
     }
 
@@ -83,12 +88,18 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     try {
       await onSendMessage(trimmed);
     } catch (err: any) {
-      setGuardrailError(err.message || "Failed to process query.");
+      setGuardrailError(formatUserErrorMessage(err, "chat"));
     }
   };
 
-  const handleSuggestionClick = (query: string) => {
-    onSendMessage(query);
+  const handleSuggestionClick = async (query: string) => {
+    if (isSending) return;
+    setGuardrailError(null);
+    try {
+      await onSendMessage(query);
+    } catch (err: any) {
+      setGuardrailError(formatUserErrorMessage(err, "chat"));
+    }
   };
 
   // Helper to parse markdown text and replace [Source N] with clickable interactive buttons
@@ -223,25 +234,87 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            background: "rgba(239, 68, 68, 0.1)",
-            border: "1px solid rgba(239, 68, 68, 0.3)",
+            background: guardrailError.includes("Security Notice")
+              ? "rgba(234, 88, 12, 0.12)"
+              : "rgba(239, 68, 68, 0.1)",
+            border: guardrailError.includes("Security Notice")
+              ? "1px solid rgba(234, 88, 12, 0.35)"
+              : "1px solid rgba(239, 68, 68, 0.3)",
             borderRadius: "var(--radius-8, 8px)",
             padding: "8px 12px",
             marginBottom: "8px",
             fontSize: "13px",
-            color: "#ef4444",
+            color: guardrailError.includes("Security Notice")
+              ? "var(--color-amber-ember, #ea580c)"
+              : "#ef4444",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <AlertCircle size={16} />
+              {guardrailError.includes("Security Notice") ? (
+                <ShieldAlert size={16} style={{ flexShrink: 0 }} />
+              ) : (
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              )}
               <span>{guardrailError}</span>
             </div>
-            <button
-              onClick={() => setGuardrailError(null)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", padding: "2px" }}
-              aria-label="Dismiss error"
-            >
-              <X size={14} />
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+              {(guardrailError.includes("Session prompt limit reached") || guardrailError.includes("start a New Chat")) && onNewChat && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuardrailError(null);
+                    onNewChat();
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "3px 8px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    borderRadius: "6px",
+                    background: "var(--color-amber-ember, #ea580c)",
+                    color: "#fff",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Plus size={12} />
+                  <span>New Chat</span>
+                </button>
+              )}
+              {guardrailError.includes("log in") && onOpenLogin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuardrailError(null);
+                    onOpenLogin();
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "3px 8px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    borderRadius: "6px",
+                    background: "#ef4444",
+                    color: "#fff",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  <LogIn size={12} />
+                  <span>Log in</span>
+                </button>
+              )}
+              <button
+                onClick={() => setGuardrailError(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", padding: "2px" }}
+                aria-label="Dismiss error"
+              >
+                <X size={14} />
+              </button>
+            </div>
           </div>
         )}
 

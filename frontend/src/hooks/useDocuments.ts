@@ -2,12 +2,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { documentService } from "../services/documentService";
 import { DocumentDetailsPayload } from "../types/document";
 
-export function useDocuments() {
+export function useDocuments(isEnabled: boolean = true) {
   const queryClient = useQueryClient();
 
   const documentsQuery = useQuery({
     queryKey: ["documents"],
     queryFn: documentService.listDocuments,
+    enabled: isEnabled,
     // Poll every 3 seconds only while documents are actively processing; avoid polling when idle or errored
     refetchInterval: (query) => {
       if (query.state.status === "error") return false;
@@ -17,7 +18,7 @@ export function useDocuments() {
     },
     retry: (failureCount, error: any) => {
       // Do not retry repeatedly if unauthenticated
-      if (error?.message?.includes("401") || error?.message?.includes("Authentication required")) {
+      if (error?.message?.includes("401") || error?.message?.includes("Authentication required") || error?.message?.includes("log in")) {
         return false;
       }
       return failureCount < 2;

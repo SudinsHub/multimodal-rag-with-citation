@@ -159,14 +159,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <Clock size={13} style={{ color: "var(--color-mid-ash)", flexShrink: 0 }} />
                     )}
                     {doc.status === "failed" && (
-                      <AlertCircle size={13} style={{ color: "var(--color-hollow)", flexShrink: 0 }} />
+                      <AlertCircle size={13} style={{ color: "var(--color-amber-ember, #ea580c)", flexShrink: 0 }} />
                     )}
                     {doc.status === "uploaded" && (
                       <Clock size={13} style={{ color: "var(--color-hollow)", flexShrink: 0 }} />
                     )}
-                    <span className="nav-item-title" title={doc.title || doc.filename}>
-                      {doc.title || doc.filename}
-                    </span>
+                    <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+                      <span
+                        className="nav-item-title"
+                        title={
+                          doc.status === "failed"
+                            ? `${doc.title || doc.filename} (Processing issue: ${doc.error_message || "Extraction failed"})`
+                            : (doc.title || doc.filename)
+                        }
+                      >
+                        {doc.title || doc.filename}
+                      </span>
+                      {doc.status === "failed" && (
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            color: "var(--color-amber-ember, #ea580c)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                          title={doc.error_message || "Extraction issue"}
+                        >
+                          {doc.error_message || "Processing failed"}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button
                     className="icon-btn"
