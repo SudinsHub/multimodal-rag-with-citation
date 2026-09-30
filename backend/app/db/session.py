@@ -146,6 +146,12 @@ def init_db():
                         CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id ON chat_sessions(user_id);
                     END IF;
                 END IF;
+
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'user') THEN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user' AND column_name = 'prompt_count') THEN
+                        ALTER TABLE "user" ADD COLUMN prompt_count INTEGER NOT NULL DEFAULT 0;
+                    END IF;
+                END IF;
             END $$;
         """))
         connection.commit()

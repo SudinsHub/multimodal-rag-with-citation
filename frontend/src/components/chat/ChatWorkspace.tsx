@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ArrowUp, Bookmark, Sparkles, FileText, Check } from "lucide-react";
+import { ArrowUp, Bookmark, Sparkles, FileText, Check, AlertCircle, X } from "lucide-react";
 import { ChatMessage } from "../../types/chat";
 import { CitationProof } from "../../types/citation";
 import { DocumentItem } from "../../types/document";
@@ -28,8 +28,15 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   isDrawerOpen,
 }) => {
   const [inputText, setInputText] = useState("");
+  const [guardrailError, setGuardrailError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Session prompt quota (max 10 prompts per session)
+  const MAX_SESSION_PROMPTS = 10;
+  const sessionPromptsUsed = messages.filter((m) => m.role === "user").length;
+  const isSessionQuotaExhausted = sessionPromptsUsed >= MAX_SESSION_PROMPTS;
+  const promptsRemaining = Math.max(0, MAX_SESSION_PROMPTS - sessionPromptsUsed);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -38,6 +45,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   // Adjust textarea height dynamically
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (guardrailError) setGuardrailError(null);
     setInputText(e.target.value);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -55,11 +63,28 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const handleSubmit = async () => {
     const trimmed = inputText.trim();
     if (!trimmed || isSending) return;
+
+    if (isSessionQuotaExhausted) {
+      setGuardrailError(`Session prompt limit reached: You have used all ${MAX_SESSION_PROMPTS} prompts for this chat. Please start a New Chat from the sidebar to continue.`);
+      return;
+    }
+
+    if (trimmed.length > 600) {
+      setGuardrailError(`Query exceeds the 600-character limit (${trimmed.length} characters). Please shorten your question.`);
+      return;
+    }
+
+    setGuardrailError(null);
     setInputText("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-    await onSendMessage(trimmed);
+
+    try {
+      await onSendMessage(trimmed);
+    } catch (err: any) {
+      setGuardrailError(err.message || "Failed to process query.");
+    }
   };
 
   const handleSuggestionClick = (query: string) => {
@@ -192,37 +217,128 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
       {/* Sticky Bottom Chat Input Bar */}
       <div className="chat-input-wrapper">
-        <div className="chat-input-box">
+        {/* Guardrail and Error Alert Banner */}
+        {guardrailError && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "rgba(239, 68, 68, 0.1)",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+            borderRadius: "var(--radius-8, 8px)",
+            padding: "8px 12px",
+            marginBottom: "8px",
+            fontSize: "13px",
+            color: "#ef4444",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <AlertCircle size={16} />
+              <span>{guardrailError}</span>
+            </div>
+            <button
+              onClick={() => setGuardrailError(null)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", padding: "2px" }}
+              aria-label="Dismiss error"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {/* Session Prompt Limit Reached Banner */}
+        {isSessionQuotaExhausted && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            background: "rgba(234, 88, 12, 0.1)",
+            border: "1px solid rgba(234, 88, 12, 0.3)",
+            borderRadius: "var(--radius-8, 8px)",
+            padding: "8px 12px",
+            marginBottom: "8px",
+            fontSize: "13px",
+            color: "var(--color-amber-ember, #ea580c)",
+          }}>
+            <AlertCircle size={16} />
+            <span>
+              <strong>Session Limit Reached ({MAX_SESSION_PROMPTS}/{MAX_SESSION_PROMPTS} prompts):</strong> You have used all available prompts for this session. Please click <strong>"New Chat"</strong> in the sidebar to start a new conversation.
+            </span>
+          </div>
+        )}
+
+        <div className="chat-input-box" style={{ opacity: isSessionQuotaExhausted ? 0.7 : 1 }}>
           <textarea
             ref={textareaRef}
             className="chat-textarea"
             placeholder={
-              selectedDocument
+              isSessionQuotaExhausted
+                ? `Session prompt limit reached (${MAX_SESSION_PROMPTS}/${MAX_SESSION_PROMPTS}). Start a New Chat to continue.`
+                : selectedDocument
                 ? `Ask about ${selectedDocument.title || selectedDocument.filename}...`
                 : "Ask about your construction specifications and drawings..."
             }
             rows={1}
+            maxLength={600}
+            disabled={isSessionQuotaExhausted || isSending}
             value={inputText}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
           />
           <div className="chat-input-toolbar">
-            <div className="target-doc-chip">
-              <FileText size={13} />
-              <span>
-                {selectedDocument
-                  ? `Target: ${selectedDocument.title || selectedDocument.filename}`
-                  : "Scope: Global RAG index"}
-              </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <div className="target-doc-chip">
+                <FileText size={13} />
+                <span>
+                  {selectedDocument
+                    ? `Target: ${selectedDocument.title || selectedDocument.filename}`
+                    : "Scope: Global RAG index"}
+                </span>
+              </div>
+
+              {/* Prompt Quota Pill */}
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                fontSize: "11px",
+                padding: "2px 8px",
+                borderRadius: "12px",
+                background: isSessionQuotaExhausted
+                  ? "rgba(239, 68, 68, 0.12)"
+                  : sessionPromptsUsed >= 7
+                  ? "rgba(234, 88, 12, 0.12)"
+                  : "var(--color-hover-veil)",
+                border: "1px solid var(--color-hairline)",
+                color: isSessionQuotaExhausted
+                  ? "#ef4444"
+                  : sessionPromptsUsed >= 7
+                  ? "var(--color-amber-ember, #ea580c)"
+                  : "var(--color-ink)",
+              }}>
+                <span>Prompts:</span>
+                <strong>{sessionPromptsUsed} / {MAX_SESSION_PROMPTS}</strong>
+              </div>
             </div>
-            <button
-              className="chat-send-btn"
-              onClick={handleSubmit}
-              disabled={!inputText.trim() || isSending}
-              aria-label="Send message"
-            >
-              <ArrowUp size={16} />
-            </button>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {/* Character Limit Counter */}
+              <span style={{
+                fontSize: "11px",
+                color: inputText.length > 550 ? "#ef4444" : "var(--color-mid-ash)",
+                fontWeight: inputText.length > 550 ? 600 : 400,
+              }}>
+                {inputText.length} / 600
+              </span>
+
+              <button
+                className="chat-send-btn"
+                onClick={handleSubmit}
+                disabled={!inputText.trim() || isSending || isSessionQuotaExhausted}
+                aria-label="Send message"
+              >
+                <ArrowUp size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </div>

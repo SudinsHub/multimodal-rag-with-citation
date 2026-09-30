@@ -25,6 +25,7 @@ from backend.app.core.auth import get_current_user
 from backend.app.services.docling_extractor import extract_document
 from backend.app.services.image_summarizer import summarize_images
 from backend.app.services.chunker import chunk_document
+from backend.app.core.guardrails import rate_limiter, validate_pdf_preflight
 from providers.factory import get_embeddings
 
 logger = logging.getLogger(__name__)
@@ -148,8 +149,11 @@ async def upload_document(
 ):
     """
     Upload a PDF document with custom extraction details.
-    Content type options: auto_detect, text_only, tables, images, scanned, mixed.
-    Scoped to current_user.
+    Guarded to:
+    - Max 2 documents per user account
+    - 1 upload per 30 seconds rate-limit
+    - Max 10MB streaming file size
+    - Max 50 pages validated via fast pre-flight check
     """
     if _ingestion_lock.locked():
         raise HTTPException(
@@ -157,20 +161,66 @@ async def upload_document(
             detail="Another document is currently being ingested. To protect server resources, please wait until it completes."
         )
 
+    # 1. Rate-limit check: 1 upload per 30 seconds
+    if not rate_limiter.check(f"upload:{current_user.id}", max_requests=1, window_seconds=30):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Upload rate limit reached: Please wait 30 seconds between document uploads."
+        )
+
+    # 2. Document count confinement: max 2 documents per user
+    existing_docs_count = db.query(Document).filter(Document.user_id == current_user.id).count()
+    if existing_docs_count >= app_settings.MAX_USER_DOCUMENTS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Document limit reached: You can have at most {app_settings.MAX_USER_DOCUMENTS} documents on your account. Please delete an existing document from the sidebar to upload a new one."
+        )
+
     if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+        raise HTTPException(status_code=400, detail="Only PDF files (.pdf) are supported.")
 
     file_id = uuid.uuid4()
     safe_filename = f"{file_id}_{file.filename}"
     saved_path = app_settings.UPLOAD_DIR / safe_filename
 
-    # Save uploaded file
-    with open(saved_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # 3. Stream upload with strict 10MB size ceiling
+    max_bytes = app_settings.MAX_FILE_SIZE_MB * 1024 * 1024
+    total_bytes = 0
+    try:
+        with open(saved_path, "wb") as buffer:
+            while chunk := await file.read(64 * 1024):
+                total_bytes += len(chunk)
+                if total_bytes > max_bytes:
+                    buffer.close()
+                    if saved_path.exists():
+                        saved_path.unlink()
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=f"File exceeds the maximum allowed size of {app_settings.MAX_FILE_SIZE_MB}MB."
+                    )
+                buffer.write(chunk)
+    except HTTPException:
+        raise
+    except Exception as e:
+        if saved_path.exists():
+            saved_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Failed to save upload: {e}")
+
+    # 4. Fast PDF Pre-flight Check (magic bytes, password encryption, max 50 pages)
+    try:
+        page_count = validate_pdf_preflight(
+            saved_path,
+            max_pages=app_settings.MAX_PDF_PAGES,
+            max_file_size_mb=app_settings.MAX_FILE_SIZE_MB,
+        )
+    except Exception:
+        if saved_path.exists():
+            saved_path.unlink()
+        raise
 
     file_size = os.path.getsize(saved_path)
 
-    # Create document record
+    # 5. Create document record
     doc = Document(
         id=file_id,
         filename=file.filename,

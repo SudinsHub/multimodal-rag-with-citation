@@ -59,6 +59,15 @@ class AppSettings(BaseSettings):
     CHUNK_MAX_TOKENS: int = int(os.getenv("CHUNK_MAX_TOKENS", "512"))
     CHUNK_MERGE_PEERS: bool = os.getenv("CHUNK_MERGE_PEERS", "true").lower() == "true"
 
+    # Guardrails and Resource Confinement
+    MAX_USER_DOCUMENTS: int = int(os.getenv("MAX_USER_DOCUMENTS", "2"))
+    MAX_FILE_SIZE_MB: int = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
+    MAX_PDF_PAGES: int = int(os.getenv("MAX_PDF_PAGES", "50"))
+    MAX_PROMPTS_PER_SESSION: int = int(os.getenv("MAX_PROMPTS_PER_SESSION", "10"))
+    MAX_MESSAGE_LENGTH: int = int(os.getenv("MAX_MESSAGE_LENGTH", "600"))
+    MAX_IMAGES_PER_DOC: int = int(os.getenv("MAX_IMAGES_PER_DOC", "3"))
+    MAX_OUTPUT_TOKENS: int = int(os.getenv("MAX_OUTPUT_TOKENS", "1024"))
+
     class Config:
         case_sensitive = True
 

@@ -23,6 +23,7 @@ class Settings:
     # ── LLM ──────────────────────────────────────────────────
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
     LLM_MODEL: str = os.getenv("LLM_MODEL", "llama3.2")
+    MAX_OUTPUT_TOKENS: int = int(os.getenv("MAX_OUTPUT_TOKENS", "1024"))
 
     # ── VLM (Vision / Multimodal) ────────────────────────────
     VLM_PROVIDER: str = os.getenv("VLM_PROVIDER", "ollama")

@@ -94,11 +94,14 @@ def search_hybrid(
     chunk_map: Dict[str, Any] = {}
 
     # Dense rankings
+    min_vector_distance = 1.0
     for rank, row in enumerate(vector_results):
         cid = str(row.id)
         chunk_map[cid] = row
         score = vector_weight * (1.0 / (rrf_k + (rank + 1)))
         rrf_scores[cid] = rrf_scores.get(cid, 0.0) + score
+        if row.distance is not None and row.distance < min_vector_distance:
+            min_vector_distance = float(row.distance)
 
     # Sparse rankings
     for rank, row in enumerate(text_results):
@@ -108,28 +111,11 @@ def search_hybrid(
         score = bm25_weight * (1.0 / (rrf_k + (rank + 1)))
         rrf_scores[cid] = rrf_scores.get(cid, 0.0) + score
 
-    # Fallback if both returned nothing (e.g. empty or purely random query)
-    if not rrf_scores:
-        fallback_query = db.query(DocumentChunk)
-        if document_id:
-            fallback_query = fallback_query.filter(DocumentChunk.document_id == document_id)
-        if user_id:
-            fallback_query = fallback_query.join(DocumentChunk.document).filter(Document.user_id == user_id)
-        fallback_chunks = fallback_query.limit(top_k).all()
-        return [
-            {
-                "id": str(c.id),
-                "document_id": str(c.document_id),
-                "text": c.text,
-                "page_numbers": c.page_numbers or [],
-                "bboxes": c.bboxes or [],
-                "headings": c.headings or [],
-                "element_type": c.element_type,
-                "doc_id": c.doc_id,
-                "score": 0.0,
-            }
-            for c in fallback_chunks
-        ]
+    # Guardrail: Relevance and Semantic Overlap Gatekeeper
+    # If there are zero keyword matches AND vector distance is high (> 0.72), query has no overlap with document
+    has_text_matches = len(text_results) > 0
+    if (not has_text_matches and min_vector_distance > 0.72) or not rrf_scores:
+        return []
 
     # Sort candidates by combined RRF score
     sorted_chunk_ids = sorted(rrf_scores.keys(), key=lambda k: rrf_scores[k], reverse=True)[:top_k]

@@ -3,7 +3,7 @@ User and Session database models matching Better Auth schema in PostgreSQL.
 """
 
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Index, Integer
 from sqlalchemy.orm import relationship
 from backend.app.db.base import Base
 
@@ -15,6 +15,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     email_verified = Column("emailVerified", Boolean, default=False, nullable=False)
     image = Column(String, nullable=True)
+    prompt_count = Column(Integer, default=0, nullable=False)
     created_at = Column("createdAt", DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column("updatedAt", DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

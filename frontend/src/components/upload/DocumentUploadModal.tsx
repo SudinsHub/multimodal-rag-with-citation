@@ -8,6 +8,7 @@ interface DocumentUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpload: (payload: DocumentDetailsPayload) => Promise<any>;
+  existingDocumentsCount?: number;
 }
 
 const CONTENT_TYPE_OPTIONS: {
@@ -58,6 +59,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   isOpen,
   onClose,
   onUpload,
+  existingDocumentsCount = 0,
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [contentType, setContentType] = useState<ContentTypeOption>("auto_detect");
@@ -70,13 +72,21 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const isLimitReached = existingDocumentsCount >= 2;
+
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
       if (!selected.name.toLowerCase().endsWith(".pdf")) {
-        setError("Please select a valid PDF file.");
+        setError("Please select a valid PDF file (.pdf).");
+        return;
+      }
+      // Strict 10MB client check
+      if (selected.size > 10 * 1024 * 1024) {
+        setError(`File size exceeds 10MB limit (${(selected.size / (1024 * 1024)).toFixed(1)}MB). Please choose a smaller PDF.`);
+        setFile(null);
         return;
       }
       setFile(selected);
@@ -89,6 +99,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLimitReached) {
+      setError("Document limit reached (max 2 documents). Please delete an existing document first.");
+      return;
+    }
     if (!file) {
       setError("Please choose a PDF document to upload.");
       return;
@@ -121,11 +135,30 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     <div className="modal-scrim" onClick={onClose}>
       <div className="modal-surface" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">Upload Document & Choose Details</div>
+          <div>
+            <div className="modal-title">Upload Document & Extraction Options</div>
+            <div style={{ display: "flex", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "12px", background: "var(--color-hover-veil)", border: "1px solid var(--color-hairline)", color: "var(--color-ink)" }}>
+                📄 Max 2 Documents ({existingDocumentsCount}/2 used)
+              </span>
+              <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "12px", background: "var(--color-hover-veil)", border: "1px solid var(--color-hairline)", color: "var(--color-ink)" }}>
+                ⚖️ Max 10 MB per file
+              </span>
+              <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "12px", background: "var(--color-hover-veil)", border: "1px solid var(--color-hairline)", color: "var(--color-ink)" }}>
+                📑 Max 50 Pages
+              </span>
+            </div>
+          </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close">
             <X size={18} />
           </button>
         </div>
+
+        {isLimitReached && (
+          <div style={{ padding: "10px 14px", borderRadius: "8px", background: "rgba(234, 88, 12, 0.1)", border: "1px solid rgba(234, 88, 12, 0.3)", fontSize: "13px", color: "var(--color-amber-ember, #ea580c)" }}>
+            ⚠️ <strong>Document Limit Reached:</strong> Each user account is limited to 2 uploaded documents. Please delete an existing document from the left sidebar before uploading a new one.
+          </div>
+        )}
 
         {error && (
           <div style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #ff4d4f", fontSize: "13px", color: "#ff4d4f" }}>
@@ -137,20 +170,26 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           {/* File Dropzone */}
           <div
             style={{
-              border: "1px dashed var(--color-hairline)",
+              border: isLimitReached ? "1px solid var(--color-hairline)" : "1px dashed var(--color-hairline)",
               borderRadius: "var(--radius-10)",
               padding: "20px",
               textAlign: "center",
-              cursor: "pointer",
+              cursor: isLimitReached ? "not-allowed" : "pointer",
+              opacity: isLimitReached ? 0.6 : 1,
               backgroundColor: file ? "var(--color-hover-veil)" : "var(--color-sidebar-mist)",
             }}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              if (!isLimitReached) {
+                fileInputRef.current?.click();
+              }
+            }}
           >
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
               accept=".pdf"
+              disabled={isLimitReached}
               style={{ display: "none" }}
             />
             <UploadCloud size={28} style={{ margin: "0 auto 8px auto", color: "var(--color-mid-ash)" }} />

@@ -35,7 +35,7 @@ class ChatMessageResponse(BaseModel):
         from_attributes = True
 
 class ChatQueryRequest(BaseModel):
-    message: str = Field(..., min_length=1, description="Question or search query")
+    message: str = Field(..., min_length=1, max_length=600, description="Question or search query (max 600 characters)")
     document_id: Optional[UUID] = Field(None, description="Optional target document filter")
 
 class ChatQueryResponse(BaseModel):
@@ -45,3 +45,6 @@ class ChatQueryResponse(BaseModel):
     answer: str
     citations: List[CitationProof] = Field(default_factory=list)
     num_sources: int
+    session_prompts_used: int = Field(0, description="Total user prompts submitted in this session")
+    session_prompts_remaining: int = Field(10, description="Remaining prompts allowed in this session")
+    total_user_prompts: Optional[int] = Field(None, description="Total lifetime prompts submitted by this user")

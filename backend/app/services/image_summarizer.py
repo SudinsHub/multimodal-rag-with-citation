@@ -13,12 +13,19 @@ from PIL import Image
 from langchain_core.messages import HumanMessage
 from providers.factory import get_vlm
 
+import time
+from backend.app.core.config import app_settings
+
 logger = logging.getLogger(__name__)
+
+MAX_IMAGES_PER_DOC = app_settings.MAX_IMAGES_PER_DOC
+MIN_IMAGE_DIMENSION = 150  # Skip tiny/decorative images < 150x150 px
 
 def summarize_images(doc: Any, content_type: str) -> List[Dict[str, Any]]:
     """
     Extract figures/pictures from DoclingDocument, run VLM summarization,
     and return list of chunk dictionaries with citation metadata.
+    Guarded to max 3 images per document, skips icons/tiny images, and throttles calls.
     """
     if content_type not in ("images", "mixed", "auto_detect"):
         return []
@@ -36,6 +43,10 @@ def summarize_images(doc: Any, content_type: str) -> List[Dict[str, Any]]:
         return []
 
     for idx, picture in enumerate(pictures):
+        if len(image_summaries) >= MAX_IMAGES_PER_DOC:
+            logger.info(f"Reached MAX_IMAGES_PER_DOC ({MAX_IMAGES_PER_DOC}). Skipping remaining images to protect free-tier API quota.")
+            break
+
         try:
             page_numbers = []
             bboxes = []
@@ -60,6 +71,12 @@ def summarize_images(doc: Any, content_type: str) -> List[Dict[str, Any]]:
                 else:
                     continue
 
+                # Guard: Skip decorative or tiny icons (< 150x150 px)
+                width, height = pil_img.size
+                if width < MIN_IMAGE_DIMENSION or height < MIN_IMAGE_DIMENSION:
+                    logger.debug(f"Skipping tiny/decorative image {idx} ({width}x{height} px).")
+                    continue
+
                 buf = io.BytesIO()
                 pil_img.save(buf, format="PNG")
                 image_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
@@ -81,6 +98,10 @@ def summarize_images(doc: Any, content_type: str) -> List[Dict[str, Any]]:
                         "chunk_id": str(uuid.uuid4()),
                     })
                 continue
+
+            # Throttle between VLM calls to strictly stay under 15 RPM
+            if len(image_summaries) > 0:
+                time.sleep(2.0)
 
             message = HumanMessage(
                 content=[

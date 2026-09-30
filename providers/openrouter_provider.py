@@ -25,6 +25,7 @@ def create_chat_model(model: str, api_key: str):
             "HTTP-Referer": "https://github.com/construction-rag",
             "X-Title": "Construction RAG",
         },
+        max_tokens=1024,
     )
 
 
@@ -39,4 +40,5 @@ def create_vision_model(model: str, api_key: str):
             "HTTP-Referer": "https://github.com/construction-rag",
             "X-Title": "Construction RAG",
         },
+        max_tokens=1024,
     )

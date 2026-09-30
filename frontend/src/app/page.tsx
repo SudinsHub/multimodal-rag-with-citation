@@ -172,6 +172,7 @@ export default function Home() {
       <DocumentUploadModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
+        existingDocumentsCount={documents.length}
         onUpload={async (payload) => {
           await uploadDocument(payload);
         }}

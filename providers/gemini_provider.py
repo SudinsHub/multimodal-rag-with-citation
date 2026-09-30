@@ -4,11 +4,12 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 
 def create_chat_model(model: str, api_key: str):
-    """Create a text chat model using Google Gemini."""
+    """Create a text chat model using Google Gemini with output token guardrail."""
     return ChatGoogleGenerativeAI(
         model=model,
         google_api_key=api_key,
         temperature=0.1,
+        max_output_tokens=1024,
     )
 
 
@@ -21,4 +22,5 @@ def create_vision_model(model: str, api_key: str):
         model=model,
         google_api_key=api_key,
         temperature=0.1,
+        max_output_tokens=1024,
     )

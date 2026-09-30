@@ -9,6 +9,7 @@ def create_chat_model(model: str, api_key: str):
         model=model,
         api_key=api_key,
         temperature=0.1,
+        max_tokens=1024,
     )
 
 
@@ -18,4 +19,5 @@ def create_vision_model(model: str, api_key: str):
         model=model,
         api_key=api_key,
         temperature=0.1,
+        max_tokens=1024,
     )

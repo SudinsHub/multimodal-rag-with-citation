@@ -21,6 +21,8 @@ from backend.app.schemas.chat import (
 )
 from backend.app.schemas.citation import CitationProof
 from backend.app.services.rag_orchestrator import execute_rag
+from backend.app.core.config import app_settings
+from backend.app.core.guardrails import rate_limiter, check_input_safety
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -122,13 +124,46 @@ def send_message(
         if not doc:
             raise HTTPException(status_code=404, detail="Target document not found or access denied.")
 
-    # 1. Save user message
+    # 1. Rate-limit check: 5 messages per minute
+    if not rate_limiter.check(f"chat:{current_user.id}", max_requests=5, window_seconds=60):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Rate limit reached: Maximum 5 chat messages per minute. Please pause a moment before asking another question."
+        )
+
+    # 2. Input Heuristic Guard: check length and prompt injection / jailbreak patterns
+    safety_violation = check_input_safety(payload.message, max_chars=app_settings.MAX_MESSAGE_LENGTH)
+    if safety_violation:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=safety_violation
+        )
+
+    # 3. User Prompt Quota: Max 10 prompts per session
+    session_user_prompts = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.session_id == session_id, ChatMessage.role == "user")
+        .count()
+    )
+    if session_user_prompts >= app_settings.MAX_PROMPTS_PER_SESSION:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"Session prompt limit reached: You can send at most {app_settings.MAX_PROMPTS_PER_SESSION} "
+                "prompts in a single chat session. Please create a new chat session to continue."
+            )
+        )
+
+    # 4. Save user message
     user_msg = ChatMessage(
         session_id=session_id,
         role="user",
         content=payload.message,
     )
     db.add(user_msg)
+    
+    # Increment user's lifetime prompt count
+    current_user.prompt_count = (current_user.prompt_count or 0) + 1
     db.commit()
 
     # Update session title if it's the default title
@@ -137,7 +172,7 @@ def send_message(
         session.title = snippet[:40] + ("..." if len(snippet) > 40 else "")
         db.commit()
 
-    # 2. Execute RAG pipeline scoped to current_user
+    # 5. Execute RAG pipeline scoped to current_user
     rag_output = execute_rag(
         db=db,
         query=payload.message,
@@ -147,7 +182,7 @@ def send_message(
 
     citations_dicts = [c.model_dump() for c in rag_output["citations"]]
 
-    # 3. Save assistant message
+    # 6. Save assistant message
     assistant_msg = ChatMessage(
         session_id=session_id,
         role="assistant",
@@ -158,6 +193,9 @@ def send_message(
     db.commit()
     db.refresh(assistant_msg)
 
+    used_prompts = session_user_prompts + 1
+    remaining_prompts = max(0, app_settings.MAX_PROMPTS_PER_SESSION - used_prompts)
+
     return ChatQueryResponse(
         session_id=session_id,
         message_id=assistant_msg.id,
@@ -165,4 +203,7 @@ def send_message(
         answer=rag_output["answer"],
         citations=rag_output["citations"],
         num_sources=rag_output["num_sources"],
+        session_prompts_used=used_prompts,
+        session_prompts_remaining=remaining_prompts,
+        total_user_prompts=current_user.prompt_count,
     )
