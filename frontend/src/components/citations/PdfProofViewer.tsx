@@ -9,7 +9,8 @@ import {
   RotateCcw, 
   Loader2, 
   AlertCircle,
-  Eye
+  Eye,
+  Maximize
 } from "lucide-react";
 import { BoundingBox } from "../../types/citation";
 
@@ -34,7 +35,12 @@ export const PdfProofViewer: React.FC<PdfProofViewerProps> = ({
 }) => {
   const [currentPage, setCurrentPage] = useState<number>(targetPage);
   const [numPages, setNumPages] = useState<number>(1);
-  const [zoom, setZoom] = useState<number>(1.25);
+  const [zoom, setZoom] = useState<number>(() => {
+    if (typeof window !== "undefined" && window.innerWidth <= 768) {
+      return 0.85;
+    }
+    return 1.25;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -200,9 +206,23 @@ export const PdfProofViewer: React.FC<PdfProofViewerProps> = ({
     setZoom((z) => Math.max(0.6, +(z - 0.2).toFixed(2)));
   };
 
+  const handleFitWidth = useCallback(() => {
+    if (!pdfDocRef.current || !containerRef.current) return;
+    pdfDocRef.current.getPage(currentPage).then((page: any) => {
+      const viewport = page.getViewport({ scale: 1 });
+      const containerWidth = containerRef.current?.clientWidth || 360;
+      const targetScale = Math.max(0.35, Math.min(2.2, (containerWidth - 28) / viewport.width));
+      setZoom(+targetScale.toFixed(2));
+    });
+  }, [currentPage]);
+
   const handleResetToCitation = () => {
     if (targetPage) setCurrentPage(targetPage);
-    setZoom(1.25);
+    if (typeof window !== "undefined" && window.innerWidth <= 768) {
+      handleFitWidth();
+    } else {
+      setZoom(1.25);
+    }
   };
 
   // Check if active citation has bounding boxes on the CURRENT page
@@ -219,17 +239,19 @@ export const PdfProofViewer: React.FC<PdfProofViewerProps> = ({
             onClick={handlePrevPage} 
             disabled={currentPage <= 1 || isLoading}
             title="Previous Page"
+            aria-label="Previous Page"
           >
             <ChevronLeft size={16} />
           </button>
           <span className="pdf-page-indicator">
-            Page {currentPage} of {numPages}
+            {currentPage} / {numPages}
           </span>
           <button 
             className="pdf-tool-btn" 
             onClick={handleNextPage} 
             disabled={currentPage >= numPages || isLoading}
             title="Next Page"
+            aria-label="Next Page"
           >
             <ChevronRight size={16} />
           </button>
@@ -243,20 +265,24 @@ export const PdfProofViewer: React.FC<PdfProofViewerProps> = ({
             title={`Return to cited Page ${targetPage}`}
           >
             <Eye size={13} />
-            <span>Go to Proof (P. {targetPage})</span>
+            <span>P. {targetPage}</span>
           </button>
         )}
 
         {/* Zoom Controls */}
         <div className="pdf-toolbar-group">
-          <button className="pdf-tool-btn" onClick={handleZoomOut} title="Zoom Out">
+          <button className="pdf-tool-btn" onClick={handleZoomOut} title="Zoom Out" aria-label="Zoom Out">
             <ZoomOut size={15} />
           </button>
           <span className="pdf-zoom-text">{Math.round(zoom * 100)}%</span>
-          <button className="pdf-tool-btn" onClick={handleZoomIn} title="Zoom In">
+          <button className="pdf-tool-btn" onClick={handleZoomIn} title="Zoom In" aria-label="Zoom In">
             <ZoomIn size={15} />
           </button>
-          <button className="pdf-tool-btn" onClick={handleResetToCitation} title="Reset Zoom">
+          <button className="pdf-tool-btn" onClick={handleFitWidth} title="Fit to width" aria-label="Fit to width">
+            <Maximize size={13} />
+            <span style={{ fontSize: "11px", fontWeight: 600, marginLeft: "3px" }}>Fit</span>
+          </button>
+          <button className="pdf-tool-btn" onClick={handleResetToCitation} title="Reset Zoom" aria-label="Reset Zoom">
             <RotateCcw size={14} />
           </button>
         </div>

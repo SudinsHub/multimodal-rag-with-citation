@@ -13,6 +13,7 @@ import {
   Clock,
   AlertCircle,
   LogIn,
+  PanelLeftClose,
 } from "lucide-react";
 import { ChatSession } from "../../types/chat";
 import { DocumentItem } from "../../types/document";
@@ -38,6 +39,9 @@ interface SidebarProps {
     image?: string | null;
   } | null;
   onOpenLogin?: () => void;
+  isOpen?: boolean;
+  onToggleSidebar?: () => void;
+  onCloseSidebar?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -55,23 +59,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleTheme,
   user,
   onOpenLogin,
+  isOpen = true,
+  onToggleSidebar,
+  onCloseSidebar,
 }) => {
   return (
-    <aside className="sidebar" aria-label="Main Navigation Sidebar">
+    <aside
+      className={`sidebar ${isOpen ? "open" : "collapsed"}`}
+      aria-label="Main Navigation Sidebar"
+      aria-hidden={!isOpen}
+    >
       {/* Header & New Chat */}
       <div className="sidebar-header">
-        <button className="sidebar-action-btn" onClick={onNewChat}>
+        <button className="sidebar-action-btn" onClick={onNewChat} aria-label="Start new chat">
           <Plus size={16} />
           <span>New chat</span>
         </button>
-        <button
-          className="icon-btn"
-          onClick={onToggleTheme}
-          title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-          aria-label="Toggle dark/light theme"
-        >
-          {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
+          <button
+            className="icon-btn"
+            onClick={onToggleTheme}
+            title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+            aria-label="Toggle dark/light theme"
+          >
+            {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
+          </button>
+          {onToggleSidebar && (
+            <button
+              className="icon-btn sidebar-collapse-btn"
+              onClick={onToggleSidebar}
+              title="Close sidebar"
+              aria-label="Close sidebar"
+            >
+              <PanelLeftClose size={17} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="sidebar-scroll-area">

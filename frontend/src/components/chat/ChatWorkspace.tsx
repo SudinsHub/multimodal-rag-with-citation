@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ArrowUp, Bookmark, Sparkles, FileText, AlertCircle, X, ShieldAlert, LogIn, Plus } from "lucide-react";
+import { ArrowUp, Bookmark, Sparkles, FileText, AlertCircle, X, ShieldAlert, LogIn, Plus, PanelLeft } from "lucide-react";
 import { ChatMessage } from "../../types/chat";
 import { CitationProof } from "../../types/citation";
 import { DocumentItem } from "../../types/document";
@@ -18,6 +18,8 @@ interface ChatWorkspaceProps {
   isDrawerOpen: boolean;
   onNewChat?: () => void;
   onOpenLogin?: () => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
@@ -31,6 +33,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   isDrawerOpen,
   onNewChat,
   onOpenLogin,
+  isSidebarOpen = true,
+  onToggleSidebar,
 }) => {
   const [inputText, setInputText] = useState("");
   const [guardrailError, setGuardrailError] = useState<string | null>(null);
@@ -134,35 +138,62 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     <main className="main-canvas" aria-label="Conversation Surface">
       {/* Canvas Header */}
       <header className="canvas-header">
-        <div className="canvas-title">
-          <span>{activeSessionTitle}</span>
-          {selectedDocument ? (
-            <span style={{ fontSize: "12px", color: "var(--color-mid-ash)", fontWeight: 400 }}>
-              (Scoping to: {selectedDocument.title || selectedDocument.filename})
-            </span>
-          ) : (
-            <span style={{ fontSize: "12px", color: "var(--color-hollow)", fontWeight: 400 }}>
-              (All Documents)
-            </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
+          {onToggleSidebar && (
+            <button
+              className={`icon-btn sidebar-toggle-btn ${!isSidebarOpen ? "visible" : ""}`}
+              onClick={onToggleSidebar}
+              title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+              aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+            >
+              <PanelLeft size={18} />
+            </button>
           )}
+
+          {onNewChat && (
+            <button
+              className="icon-btn mobile-header-action-btn"
+              onClick={onNewChat}
+              title="New Chat"
+              aria-label="New Chat"
+            >
+              <Plus size={18} />
+            </button>
+          )}
+
+          <div className="canvas-title">
+            <span className="canvas-title-text" title={activeSessionTitle}>{activeSessionTitle}</span>
+            {selectedDocument ? (
+              <span className="canvas-subtitle" title={`Scoping to: ${selectedDocument.title || selectedDocument.filename}`}>
+                ({selectedDocument.title || selectedDocument.filename})
+              </span>
+            ) : (
+              <span className="canvas-subtitle hollow">
+                (All Docs)
+              </span>
+            )}
+          </div>
         </div>
 
-        <button
-          className="sidebar-action-btn"
-          style={{ width: "auto", padding: "6px 12px", fontSize: "13px" }}
-          onClick={() => {
-            // Collect citations from latest assistant message
-            const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant" && m.citations?.length);
-            if (lastAssistantMsg && lastAssistantMsg.citations) {
-              onOpenCitationDrawer(lastAssistantMsg.citations);
-            } else {
-              onOpenCitationDrawer([]);
-            }
-          }}
-        >
-          <Bookmark size={14} />
-          <span>{isDrawerOpen ? "Close Proof" : "Search Proof"}</span>
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+          <button
+            className="search-proof-trigger-btn"
+            onClick={() => {
+              // Collect citations from latest assistant message
+              const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant" && m.citations?.length);
+              if (lastAssistantMsg && lastAssistantMsg.citations) {
+                onOpenCitationDrawer(lastAssistantMsg.citations);
+              } else {
+                onOpenCitationDrawer([]);
+              }
+            }}
+            title={isDrawerOpen ? "Close Proof" : "Search Proof"}
+            aria-label={isDrawerOpen ? "Close Proof" : "Search Proof"}
+          >
+            <Bookmark size={14} />
+            <span className="proof-btn-label">{isDrawerOpen ? "Close Proof" : "Search Proof"}</span>
+          </button>
+        </div>
       </header>
 
       {/* Messages Scroll Area */}

@@ -29,6 +29,10 @@ export default function Home() {
   const [drawerCitations, setDrawerCitations] = useState<CitationProof[]>([]);
   const [activeSourceNum, setActiveSourceNum] = useState<number | null>(null);
 
+  // Sidebar responsive & collapse state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
   // Hooks - enable only when authenticated to prevent premature 401 calls
   const { documents, uploadDocument, deleteDocument } = useDocuments(Boolean(currentUser));
   const {
@@ -40,6 +44,44 @@ export default function Home() {
     sendMessage,
     isSending,
   } = useChat(activeSessionId, Boolean(currentUser));
+
+  // Initialize responsive sidebar and theme preference
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+    };
+    checkMobile();
+
+    // Check saved state for desktop
+    const mobile = window.innerWidth <= 768;
+    const savedSidebar = localStorage.getItem("rag-sidebar-open");
+    if (savedSidebar !== null) {
+      setIsSidebarOpen(savedSidebar === "true");
+    } else {
+      setIsSidebarOpen(!mobile);
+    }
+
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      if (!isMobile) {
+        localStorage.setItem("rag-sidebar-open", String(next));
+      }
+      return next;
+    });
+  };
+
+  const handleCloseSidebar = () => {
+    setIsSidebarOpen(false);
+    if (!isMobile) {
+      localStorage.setItem("rag-sidebar-open", "false");
+    }
+  };
 
   // Initialize theme from preference or localStorage
   useEffect(() => {
@@ -76,6 +118,9 @@ export default function Home() {
   }, [sessions, activeSessionId]);
 
   const handleNewChat = async () => {
+    if (isMobile) {
+      setIsSidebarOpen(false);
+    }
     if (!currentUser) {
       setIsAuthModalOpen(true);
       return;
@@ -170,11 +215,25 @@ export default function Home() {
         </div>
       )}
 
+      {/* Mobile Sidebar Backdrop Overlay */}
+      <div
+        className={`sidebar-backdrop ${isSidebarOpen ? "active" : ""}`}
+        onClick={handleCloseSidebar}
+        aria-hidden={!isSidebarOpen}
+        tabIndex={-1}
+      />
+
       {/* Sidebar navigation */}
       <Sidebar
+        isOpen={isSidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
+        onCloseSidebar={handleCloseSidebar}
         sessions={sessions}
         activeSessionId={activeSessionId}
-        onSelectSession={(id) => setActiveSessionId(id)}
+        onSelectSession={(id) => {
+          setActiveSessionId(id);
+          if (isMobile) setIsSidebarOpen(false);
+        }}
         onNewChat={handleNewChat}
         onDeleteSession={async (id) => {
           try {
@@ -191,7 +250,10 @@ export default function Home() {
         }}
         documents={documents}
         selectedDocumentId={selectedDocumentId}
-        onSelectDocument={(id) => setSelectedDocumentId(id)}
+        onSelectDocument={(id) => {
+          setSelectedDocumentId(id);
+          if (isMobile) setIsSidebarOpen(false);
+        }}
         onOpenUploadModal={() => {
           if (!currentUser) {
             setIsAuthModalOpen(true);
@@ -220,6 +282,8 @@ export default function Home() {
 
       {/* Main Conversation Canvas */}
       <ChatWorkspace
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
         messages={messages}
         isLoadingMessages={isLoadingMessages}
         isSending={isSending}

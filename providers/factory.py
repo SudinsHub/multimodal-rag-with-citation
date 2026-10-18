@@ -99,7 +99,10 @@ def get_embeddings():
 
     if provider == "local":
         from langchain_huggingface import HuggingFaceEmbeddings
-        return HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
+        return HuggingFaceEmbeddings(
+            model_name=settings.EMBEDDING_MODEL,
+            encode_kwargs={"normalize_embeddings": True},
+        )
 
     elif provider == "openai":
         from langchain_openai import OpenAIEmbeddings

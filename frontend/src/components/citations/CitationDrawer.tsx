@@ -10,6 +10,8 @@ import {
   Layers, 
   Maximize2, 
   Minimize2, 
+  ChevronUp,
+  ChevronDown,
   ExternalLink,
   ChevronRight,
   Sparkles
@@ -28,6 +30,7 @@ interface CitationDrawerProps {
 
 type PanelWidthMode = "standard" | "wide" | "fullscreen";
 type ViewMode = "pdf" | "cards";
+type MobileHeightMode = "half" | "full";
 
 export const CitationDrawer: React.FC<CitationDrawerProps> = ({
   isOpen,
@@ -39,6 +42,17 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>("pdf");
   const [widthMode, setWidthMode] = useState<PanelWidthMode>("standard");
+  const [mobileHeight, setMobileHeight] = useState<MobileHeightMode>("full");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Determine active citation
   const activeCite = 
@@ -66,6 +80,10 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
     else setWidthMode("standard");
   };
 
+  const toggleMobileHeight = () => {
+    setMobileHeight((prev) => (prev === "full" ? "half" : "full"));
+  };
+
   const getDrawerWidthClass = () => {
     if (widthMode === "wide") return "citation-drawer-wide";
     if (widthMode === "fullscreen") return "citation-drawer-fullscreen";
@@ -74,28 +92,44 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
 
   return (
     <aside 
-      className={`citation-drawer ${isOpen ? "open" : ""} ${getDrawerWidthClass()}`} 
+      className={`citation-drawer ${isOpen ? "open" : ""} ${getDrawerWidthClass()} ${isMobile ? (mobileHeight === "half" ? "mobile-half" : "mobile-full") : ""}`} 
       aria-label="Search Proof & Citation Inspector"
     >
+      {/* Mobile Top Drag / Resize Handle Bar */}
+      <div 
+        className="mobile-drawer-handle-bar" 
+        onClick={toggleMobileHeight}
+        role="button"
+        tabIndex={0}
+        aria-label={mobileHeight === "full" ? "Switch to half-height drawer" : "Switch to full-screen drawer"}
+        title={mobileHeight === "full" ? "Tap to collapse to half screen" : "Tap to expand to full screen"}
+      >
+        <div className="mobile-drawer-handle-pill" />
+      </div>
+
       {/* Drawer Header */}
       <div className="drawer-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div className="drawer-header-left" style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
           <div className="drawer-title-icon">
             <Bookmark size={16} />
           </div>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: "14px", lineHeight: 1.2 }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="drawer-title-text" style={{ fontWeight: 600, fontSize: "14px", lineHeight: 1.2 }}>
               Search Proof Inspector
             </div>
             {activeCite?.document_title && (
-              <div style={{ fontSize: "11px", color: "var(--color-mid-ash)", marginTop: "2px" }}>
+              <div 
+                className="drawer-subtitle-text"
+                style={{ fontSize: "11px", color: "var(--color-mid-ash)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                title={activeCite.document_title}
+              >
                 {activeCite.document_title}
               </div>
             )}
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
           {/* View mode toggle pills */}
           <div className="view-mode-toggle">
             <button
@@ -116,14 +150,26 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
             </button>
           </div>
 
-          {/* Panel Width Expander */}
-          <button 
-            className="icon-btn" 
-            onClick={toggleWidthMode} 
-            title={widthMode === "fullscreen" ? "Restore width" : "Expand panel"}
-          >
-            {widthMode === "fullscreen" ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          </button>
+          {/* Panel Size Expander: Mobile Height Switcher or Desktop Width Switcher */}
+          {isMobile ? (
+            <button 
+              className="icon-btn mobile-size-toggle-btn" 
+              onClick={toggleMobileHeight} 
+              title={mobileHeight === "full" ? "Switch to half screen" : "Switch to full screen"}
+              aria-label={mobileHeight === "full" ? "Switch to half screen" : "Switch to full screen"}
+            >
+              {mobileHeight === "full" ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              <span className="mobile-size-label">{mobileHeight === "full" ? "Half" : "Full"}</span>
+            </button>
+          ) : (
+            <button 
+              className="icon-btn desktop-width-toggle-btn" 
+              onClick={toggleWidthMode} 
+              title={widthMode === "fullscreen" ? "Restore width" : "Expand panel"}
+            >
+              {widthMode === "fullscreen" ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+          )}
 
           {/* Close Panel Button */}
           <button className="icon-btn" onClick={onClose} aria-label="Close panel">
