@@ -65,9 +65,15 @@ def import_document(
     logger.info(f"Loaded {len(chunks_data)} chunks from export.")
 
     from backend.app.core.config import app_settings
-    from backend.app.db.session import SessionLocal
+    from backend.app.db.session import SessionLocal, init_db
     from backend.app.db.models.document import Document, DocumentChunk
     from backend.app.db.models.user import User
+
+    # Ensure schema migrations (like user.prompt_count) are applied
+    try:
+        init_db()
+    except Exception as e:
+        logger.warning(f"init_db check returned: {e}")
 
     db = SessionLocal()
     try:
