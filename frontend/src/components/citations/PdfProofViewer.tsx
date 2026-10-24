@@ -363,16 +363,12 @@ export const PdfProofViewer: React.FC<PdfProofViewerProps> = ({
                     ref={idx === 0 ? activeHighlightRef : undefined}
                     className="pdf-highlight-box"
                     style={{
-                      left,
-                      top,
-                      width,
-                      height,
+                      left: `calc(${left} - 5px)`,
+                      top: `calc(${top} - 3px)`,
+                      width: `calc(${width} + 10px)`,
+                      height: `calc(${height} + 6px)`,
                     }}
-                  >
-                    <div className="pdf-highlight-badge">
-                      Source {activeSourceNum ?? 1}
-                    </div>
-                  </div>
+                  />
                 );
               })}
             </div>

@@ -178,34 +178,6 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
         </div>
       </div>
 
-      {/* Sources Quick Selector Bar */}
-      {citations.length > 0 && (
-        <div className="sources-quick-bar">
-          <span className="sources-bar-label">Citations:</span>
-          <div className="sources-pills-list">
-            {citations.map((cite) => {
-              const isSelected = activeCite?.source_num === cite.source_num;
-              return (
-                <button
-                  key={cite.source_num}
-                  className={`source-pill-btn ${isSelected ? "active" : ""}`}
-                  onClick={() => {
-                    onSelectSource?.(cite.source_num);
-                    setViewMode("pdf");
-                  }}
-                >
-                  <span className="pill-dot" />
-                  <span>Source {cite.source_num}</span>
-                  {cite.page_numbers.length > 0 && (
-                    <span className="pill-page">p.{cite.page_numbers[0]}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Main Content Area */}
       <div className="drawer-content-container">
         {citations.length === 0 ? (
@@ -219,38 +191,6 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
         ) : viewMode === "pdf" ? (
           /* Live PDF Proof Mode */
           <div className="pdf-proof-container">
-            {/* Active citation context card */}
-            {activeCite && (
-              <div className="active-cite-banner">
-                <div className="active-cite-header">
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span className="active-cite-source-tag">
-                      Source {activeCite.source_num}
-                    </span>
-                    <span className="active-cite-type">
-                      {activeCite.element_type.toUpperCase()}
-                    </span>
-                  </div>
-                  {activeCite.page_numbers.length > 0 && (
-                    <span className="active-cite-page-badge">
-                      Target Page: {activeCite.page_numbers.join(", ")}
-                    </span>
-                  )}
-                </div>
-
-                {activeCite.headings && activeCite.headings.length > 0 && (
-                  <div className="active-cite-breadcrumbs">
-                    <Compass size={13} style={{ color: "var(--color-hollow)", flexShrink: 0 }} />
-                    <span className="breadcrumbs-text">{activeCite.headings.join(" › ")}</span>
-                  </div>
-                )}
-
-                <div className="active-cite-excerpt">
-                  "{activeCite.text_excerpt}"
-                </div>
-              </div>
-            )}
-
             {/* Live PDF Viewer with Highlighting */}
             {resolvedDocId ? (
               <div className="pdf-viewer-slot">
