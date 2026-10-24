@@ -7,6 +7,8 @@ import { CitationProof } from "../../types/citation";
 import { DocumentItem } from "../../types/document";
 import { formatUserErrorMessage } from "../../lib/errorHandler";
 import { ThinkingProcess } from "./ThinkingProcess";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ChatWorkspaceProps {
   messages: ChatMessage[];
@@ -111,32 +113,64 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     }
   };
 
-  // Helper to parse markdown text and replace [Source N] with clickable interactive buttons
-  const renderMessageContent = (content: string, citations?: CitationProof[]) => {
-    const parts = content.split(/(\[Source \d+\])/g);
+  // Pre-process content to transform [Source N] into markdown links [Source N](#source-N)
+  // while avoiding replacing citations inside code blocks
+  const formatContentWithCitations = (text: string) => {
+    const codeRegex = /(```[\s\S]*?```|`[^`]+`)/g;
+    return text
+      .split(codeRegex)
+      .map((chunk) => {
+        if (chunk.startsWith("```") || chunk.startsWith("`")) {
+          return chunk;
+        }
+        return chunk.replace(/\[Source\s+(\d+)\]/gi, "[$&](#source-$1)");
+      })
+      .join("");
+  };
 
-    return parts.map((part, index) => {
-      const match = part.match(/\[Source (\d+)\]/);
-      if (match) {
-        const sourceNum = parseInt(match[1], 10);
-        return (
-          <button
-            key={index}
-            className="citation-tag"
-            onClick={() => {
-              if (citations && citations.length > 0) {
-                onOpenCitationDrawer(citations, sourceNum);
+  // Helper to render markdown text with bold formatting and interactive [Source N] citation tags
+  const renderMessageContent = (content: string, citations?: CitationProof[], isUser = false) => {
+    const processedContent = isUser ? content : formatContentWithCitations(content);
+
+    return (
+      <div className={`markdown-content ${isUser ? "user-content" : ""}`}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            a: ({ href, children }) => {
+              const match = href?.match(/^#source-(\d+)$/i);
+              if (match && !isUser) {
+                const sourceNum = parseInt(match[1], 10);
+                return (
+                  <button
+                    type="button"
+                    className="citation-tag"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (citations && citations.length > 0) {
+                        onOpenCitationDrawer(citations, sourceNum);
+                      }
+                    }}
+                    title={`View evidence for Source ${sourceNum}`}
+                  >
+                    <Bookmark size={10} />
+                    <span>Source {sourceNum}</span>
+                  </button>
+                );
               }
-            }}
-            title={`View evidence for Source ${sourceNum}`}
-          >
-            <Bookmark size={10} />
-            <span>Source {sourceNum}</span>
-          </button>
-        );
-      }
-      return <span key={index}>{part}</span>;
-    });
+              return (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="markdown-link">
+                  {children}
+                </a>
+              );
+            },
+          }}
+        >
+          {processedContent}
+        </ReactMarkdown>
+      </div>
+    );
   };
 
   return (
@@ -242,8 +276,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                   {msg.role === "assistant" && msg.thoughts && msg.thoughts.length > 0 && (
                     <ThinkingProcess thoughts={msg.thoughts} isGenerating={false} />
                   )}
-                  <div style={{ whiteSpace: "pre-wrap" }}>
-                    {renderMessageContent(msg.content, msg.citations)}
+                  <div className="message-content-wrapper">
+                    {renderMessageContent(msg.content, msg.citations, msg.role === "user")}
                   </div>
                 </div>
               </div>
