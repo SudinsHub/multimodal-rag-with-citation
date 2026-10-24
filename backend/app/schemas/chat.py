@@ -45,6 +45,7 @@ class ChatQueryResponse(BaseModel):
     answer: str
     citations: List[CitationProof] = Field(default_factory=list)
     num_sources: int
+    thoughts: Optional[List[str]] = Field(default_factory=list, description="Thinking and calculation traces")
     session_prompts_used: int = Field(0, description="Total user prompts submitted in this session")
     session_prompts_remaining: int = Field(10, description="Remaining prompts allowed in this session")
     total_user_prompts: Optional[int] = Field(None, description="Total lifetime prompts submitted by this user")

@@ -2,15 +2,18 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ArrowUp, Bookmark, Sparkles, FileText, AlertCircle, X, ShieldAlert, LogIn, Plus, PanelLeft } from "lucide-react";
-import { ChatMessage } from "../../types/chat";
+import { ChatMessage, StreamStatus } from "../../types/chat";
 import { CitationProof } from "../../types/citation";
 import { DocumentItem } from "../../types/document";
 import { formatUserErrorMessage } from "../../lib/errorHandler";
+import { ThinkingProcess } from "./ThinkingProcess";
 
 interface ChatWorkspaceProps {
   messages: ChatMessage[];
   isLoadingMessages: boolean;
   isSending: boolean;
+  streamStatus?: StreamStatus | null;
+  streamThoughts?: string[];
   onSendMessage: (text: string) => Promise<any>;
   activeSessionTitle: string;
   selectedDocument: DocumentItem | null;
@@ -26,6 +29,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   messages,
   isLoadingMessages,
   isSending,
+  streamStatus,
+  streamThoughts = [],
   onSendMessage,
   activeSessionTitle,
   selectedDocument,
@@ -234,6 +239,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                   <div className="message-meta">
                     {msg.role === "user" ? "You" : "Construction Assistant"}
                   </div>
+                  {msg.role === "assistant" && msg.thoughts && msg.thoughts.length > 0 && (
+                    <ThinkingProcess thoughts={msg.thoughts} isGenerating={false} />
+                  )}
                   <div style={{ whiteSpace: "pre-wrap" }}>
                     {renderMessageContent(msg.content, msg.citations)}
                   </div>
@@ -245,10 +253,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               <div className="message-row assistant">
                 <div className="message-bubble">
                   <div className="message-meta">Construction Assistant</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-mid-ash)", fontSize: "14px" }}>
-                    <Sparkles size={16} />
-                    <span>Searching vectors, analyzing structure & generating verified answer...</span>
-                  </div>
+                  <ThinkingProcess
+                    status={streamStatus}
+                    thoughts={streamThoughts}
+                    isGenerating={true}
+                  />
                 </div>
               </div>
             )}

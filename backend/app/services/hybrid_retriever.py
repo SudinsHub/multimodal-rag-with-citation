@@ -137,3 +137,43 @@ def search_hybrid(
         })
 
     return results
+
+
+def search_hybrid_batch(
+    db: Session,
+    queries: List[str],
+    document_id: Optional[UUID] = None,
+    user_id: Optional[str] = None,
+    top_k_per_query: int = 3,
+    max_total_chunks: int = 8,
+) -> List[Dict[str, Any]]:
+    """
+    Execute multiple sub-queries in batch using local embeddings + PostgreSQL hybrid search.
+    Merges, ranks, and deduplicates retrieved chunks across all sub-queries.
+    """
+    seen_ids = set()
+    merged_results: List[Dict[str, Any]] = []
+
+    for q in queries:
+        clean_q = q.strip()
+        if not clean_q:
+            continue
+        try:
+            chunks = search_hybrid(
+                db=db,
+                query=clean_q,
+                document_id=document_id,
+                user_id=user_id,
+                top_k=top_k_per_query,
+            )
+            for c in chunks:
+                cid = c.get("id")
+                if cid and cid not in seen_ids:
+                    seen_ids.add(cid)
+                    c["matched_subquery"] = clean_q
+                    merged_results.append(c)
+        except Exception:
+            continue
+
+    # Return up to max_total_chunks deduplicated chunks
+    return merged_results[:max_total_chunks]

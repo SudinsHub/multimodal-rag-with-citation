@@ -14,7 +14,14 @@ export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   citations?: CitationProof[];
+  thoughts?: string[];
   created_at: string;
+}
+
+export interface StreamStatus {
+  step: "planning" | "searching" | "calculating" | "synthesizing" | "done" | "error";
+  label: string;
+  sub_queries?: string[];
 }
 
 export interface ChatQueryResponse {
@@ -24,4 +31,6 @@ export interface ChatQueryResponse {
   answer: string;
   citations: CitationProof[];
   num_sources: number;
+  thoughts?: string[];
 }
+

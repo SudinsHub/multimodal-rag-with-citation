@@ -1,17 +1,4 @@
-"""
-Services package initialization.
-"""
+# Services package initialization.
+# Individual services should be imported directly from their respective modules
+# to avoid hard dependencies across ingestion and retrieval/orchestration.
 
-from backend.app.services.docling_extractor import extract_document
-from backend.app.services.image_summarizer import summarize_images
-from backend.app.services.chunker import chunk_document
-from backend.app.services.hybrid_retriever import search_hybrid
-from backend.app.services.rag_orchestrator import execute_rag
-
-__all__ = [
-    "extract_document",
-    "summarize_images",
-    "chunk_document",
-    "search_hybrid",
-    "execute_rag",
-]

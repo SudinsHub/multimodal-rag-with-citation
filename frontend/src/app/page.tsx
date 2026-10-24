@@ -43,7 +43,10 @@ export default function Home() {
     deleteSession,
     sendMessage,
     isSending,
+    streamStatus,
+    streamThoughts,
   } = useChat(activeSessionId, Boolean(currentUser));
+
 
   // Initialize responsive sidebar and theme preference
   useEffect(() => {
@@ -287,6 +290,8 @@ export default function Home() {
         messages={messages}
         isLoadingMessages={isLoadingMessages}
         isSending={isSending}
+        streamStatus={streamStatus}
+        streamThoughts={streamThoughts}
         onSendMessage={handleSendMessage}
         activeSessionTitle={activeSession?.title || "New Conversation"}
         selectedDocument={selectedDocument}

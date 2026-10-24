@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { chatService } from "../services/chatService";
+import { StreamStatus } from "../types/chat";
 
 export function useChat(activeSessionId: string | null, isEnabled: boolean = true) {
   const queryClient = useQueryClient();
+  const [streamStatus, setStreamStatus] = useState<StreamStatus | null>(null);
+  const [streamThoughts, setStreamThoughts] = useState<string[]>([]);
 
   const sessionsQuery = useQuery({
     queryKey: ["chat-sessions"],
@@ -45,7 +49,7 @@ export function useChat(activeSessionId: string | null, isEnabled: boolean = tru
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       sessionId,
       message,
       documentId,
@@ -53,7 +57,20 @@ export function useChat(activeSessionId: string | null, isEnabled: boolean = tru
       sessionId: string;
       message: string;
       documentId?: string;
-    }) => chatService.sendMessage(sessionId, message, documentId),
+    }) => {
+      setStreamStatus({ step: "planning", label: "Analyzing query & planning document lookups..." });
+      setStreamThoughts([]);
+
+      try {
+        const res = await chatService.sendMessageStream(sessionId, message, documentId, {
+          onStatus: (st) => setStreamStatus(st),
+          onThought: (th) => setStreamThoughts((prev) => [...prev, th]),
+        });
+        return res;
+      } finally {
+        setStreamStatus(null);
+      }
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["chat-messages", variables.sessionId] });
       queryClient.invalidateQueries({ queryKey: ["chat-sessions"] });
@@ -70,5 +87,8 @@ export function useChat(activeSessionId: string | null, isEnabled: boolean = tru
     deleteSession: deleteSessionMutation.mutateAsync,
     sendMessage: sendMessageMutation.mutateAsync,
     isSending: sendMessageMutation.isPending,
+    streamStatus,
+    streamThoughts,
   };
 }
+

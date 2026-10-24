@@ -6,6 +6,7 @@ Provides multi-session chat with citation-backed responses.
 from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from backend.app.db.session import get_db
 from backend.app.db.models.chat import ChatSession, ChatMessage
@@ -21,8 +22,13 @@ from backend.app.schemas.chat import (
 )
 from backend.app.schemas.citation import CitationProof
 from backend.app.services.rag_orchestrator import execute_rag
+from backend.app.services.agentic_orchestrator import execute_agentic_rag, stream_agentic_rag
 from backend.app.core.config import app_settings
 from backend.app.core.guardrails import rate_limiter, check_input_safety
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -172,9 +178,9 @@ def send_message(
         session.title = snippet[:40] + ("..." if len(snippet) > 40 else "")
         db.commit()
 
-    # 5. Execute RAG pipeline scoped to current_user
+    # 5. Execute Agentic RAG pipeline scoped to current_user
     try:
-        rag_output = execute_rag(
+        rag_output = execute_agentic_rag(
             db=db,
             query=payload.message,
             document_id=target_doc_id,
@@ -229,7 +235,105 @@ def send_message(
         answer=rag_output["answer"],
         citations=rag_output["citations"],
         num_sources=rag_output["num_sources"],
+        thoughts=rag_output.get("thoughts", []),
         session_prompts_used=used_prompts,
         session_prompts_remaining=remaining_prompts,
         total_user_prompts=current_user.prompt_count,
     )
+
+
+@router.post("/sessions/{session_id}/messages/stream")
+def send_message_stream(
+    session_id: UUID,
+    payload: ChatQueryRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Stream agentic reasoning, status events, and the final response via Server-Sent Events (SSE).
+    """
+    # 1. Rate limiter
+    if not rate_limiter.is_allowed(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Rate limit exceeded. Please wait a moment before sending another query."
+        )
+
+    # 2. Input safety check
+    is_safe, error_msg = check_input_safety(payload.message)
+    if not is_safe:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
+
+    # 3. Verify session
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Chat session not found.")
+
+    target_doc_id = payload.document_id or session.document_id
+    if target_doc_id:
+        doc = db.query(Document).filter(
+            Document.id == target_doc_id,
+            Document.user_id == current_user.id
+        ).first()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Target document not found or access denied.")
+
+    session_user_prompts = db.query(ChatMessage).filter(
+        ChatMessage.session_id == session_id,
+        ChatMessage.role == "user"
+    ).count()
+
+    if session_user_prompts >= app_settings.MAX_PROMPTS_PER_SESSION:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Session prompt limit reached ({app_settings.MAX_PROMPTS_PER_SESSION} max). Please create a new chat session."
+        )
+
+    # Save user message
+    user_msg = ChatMessage(session_id=session_id, role="user", content=payload.message)
+    db.add(user_msg)
+    current_user.prompt_count = (current_user.prompt_count or 0) + 1
+    if session.title == "New Conversation":
+        snippet = payload.message.strip().replace("\n", " ")
+        session.title = snippet[:40] + ("..." if len(snippet) > 40 else "")
+    db.commit()
+
+    def event_generator():
+        try:
+            for sse_chunk in stream_agentic_rag(
+                db=db,
+                query=payload.message,
+                document_id=target_doc_id,
+                user_id=current_user.id,
+            ):
+                # If this chunk is the final "done" event, persist assistant message
+                if sse_chunk.startswith("event: done\n"):
+                    try:
+                        lines = sse_chunk.strip().split("\n")
+                        data_line = next(l for l in lines if l.startswith("data: "))
+                        done_payload = json.loads(data_line[6:])
+                        answer_text = done_payload.get("answer", "")
+                        citations = done_payload.get("citations", [])
+
+                        assistant_msg = ChatMessage(
+                            session_id=session_id,
+                            role="assistant",
+                            content=answer_text,
+                            citations=citations,
+                        )
+                        db.add(assistant_msg)
+                        db.commit()
+                    except Exception as save_err:
+                        logger.error(f"Failed to persist streamed assistant message: {save_err}")
+
+                yield sse_chunk
+        except Exception as e:
+            logger.exception(f"Error in stream_agentic_rag: {e}")
+            err_json = json.dumps({"error": str(e)})
+            yield f"event: error\ndata: {err_json}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
