@@ -66,7 +66,7 @@ class AppSettings(BaseSettings):
     MAX_PROMPTS_PER_SESSION: int = int(os.getenv("MAX_PROMPTS_PER_SESSION", "10"))
     MAX_MESSAGE_LENGTH: int = int(os.getenv("MAX_MESSAGE_LENGTH", "600"))
     MAX_IMAGES_PER_DOC: int = int(os.getenv("MAX_IMAGES_PER_DOC", "3"))
-    MAX_OUTPUT_TOKENS: int = int(os.getenv("MAX_OUTPUT_TOKENS", "1024"))
+    MAX_OUTPUT_TOKENS: int = int(os.getenv("MAX_OUTPUT_TOKENS", "4096"))
 
     class Config:
         case_sensitive = True
